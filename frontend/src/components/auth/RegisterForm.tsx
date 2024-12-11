@@ -46,13 +46,9 @@ export function RegisterForm() {
     },
   });
 
-  const handleSubmit = form.onSubmit((values) => {
-    mutation.mutate(values);
-  });
-
   return (
     <Box mx="auto">
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
         <TextInput
           required
           label="First Name"

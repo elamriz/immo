@@ -7,7 +7,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const register = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, password, firstName, lastName, userType } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -19,6 +19,8 @@ export const register = async (req: Request, res: Response): Promise<Response> =
       password,
       firstName,
       lastName,
+      userType,
+      role: 'user',
     });
 
     await user.save();
@@ -37,10 +39,15 @@ export const register = async (req: Request, res: Response): Promise<Response> =
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        userType: user.userType,
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Error creating user', error });
+    console.error('Registration error:', error);
+    return res.status(500).json({ 
+      message: 'Error creating user', 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
   }
 };
 
@@ -72,10 +79,15 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        userType: user.userType,
       },
     });
   } catch (error) {
-    return res.status(500).json({ message: 'Error logging in', error });
+    console.error('Login error:', error);
+    return res.status(500).json({ 
+      message: 'Error logging in', 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    });
   }
 };
 

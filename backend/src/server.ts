@@ -3,6 +3,9 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes';
+import propertyRoutes from './routes/propertyRoutes';
+import tenantRoutes from './routes/tenantRoutes';
+import paymentRoutes from './routes/paymentRoutes';
 
 dotenv.config();
 
@@ -14,6 +17,9 @@ app.use(express.json());
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/properties', propertyRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // MongoDB connection
 mongoose.connect(process.env.MONGODB_URI as string)

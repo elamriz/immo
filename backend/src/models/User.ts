@@ -10,6 +10,7 @@ export interface IUser extends Document {
   googleId?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
+  userType: 'owner' | 'tenant' | 'contractor';
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -48,6 +49,11 @@ const userSchema = new Schema<IUser>({
   },
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  userType: {
+    type: String,
+    enum: ['owner', 'tenant', 'contractor'],
+    required: true
+  },
 }, {
   timestamps: true,
 });
