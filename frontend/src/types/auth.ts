@@ -4,6 +4,7 @@ export interface User {
     firstName: string;
     lastName: string;
     role: 'admin' | 'user';
+    userType: 'owner' | 'tenant' | 'contractor';
   }
   
   export interface AuthResponse {
@@ -19,4 +20,5 @@ export interface User {
   export interface RegisterCredentials extends LoginCredentials {
     firstName: string;
     lastName: string;
+    userType: 'owner' | 'tenant' | 'contractor';
   }

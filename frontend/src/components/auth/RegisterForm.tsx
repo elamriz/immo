@@ -1,4 +1,4 @@
-import { TextInput, PasswordInput, Button, Group, Box } from '@mantine/core';
+import { TextInput, PasswordInput, Button, Group, Box, Select } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useMutation } from 'react-query';
 import { register } from '../../api/auth';
@@ -16,12 +16,14 @@ export function RegisterForm() {
       password: '',
       firstName: '',
       lastName: '',
+      userType: '',
     },
     validate: {
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
       password: (value) => (value.length < 6 ? 'Password should be at least 6 characters' : null),
       firstName: (value) => (value.length < 2 ? 'First name is required' : null),
       lastName: (value) => (value.length < 2 ? 'Last name is required' : null),
+      userType: (value) => (!value ? 'Please select your role' : null),
     },
   });
 
@@ -77,6 +79,18 @@ export function RegisterForm() {
           label="Password"
           placeholder="Your password"
           {...form.getInputProps('password')}
+        />
+        <Select
+          required
+          mt="md"
+          label="I am a"
+          placeholder="Select your role"
+          data={[
+            { value: 'owner', label: 'Property Owner' },
+            { value: 'tenant', label: 'Tenant' },
+            { value: 'contractor', label: 'Contractor' },
+          ]}
+          {...form.getInputProps('userType')}
         />
         <Group justify="flex-end" mt="md">
           <Button type="submit" loading={mutation.isLoading}>
