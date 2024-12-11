@@ -91,11 +91,11 @@ export function Dashboard() {
           properties={properties}
           onUpdate={(updatedProperty) => {
             setProperties(properties.map(p => 
-              p.id === updatedProperty.id ? updatedProperty : p
+              p._id === updatedProperty._id ? updatedProperty : p
             ));
           }}
           onDelete={(deletedId) => {
-            setProperties(properties.filter(p => p.id !== deletedId));
+            setProperties(properties.filter(p => p._id !== deletedId));
           }}
         />
       )}

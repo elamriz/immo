@@ -15,29 +15,11 @@ interface PropertyListProps {
 export function PropertyList({ properties, onUpdate, onDelete }: PropertyListProps) {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteProperty(id);
-      onDelete(id);
-      notifications.show({
-        title: 'Success',
-        message: 'Property deleted successfully',
-        color: 'green',
-      });
-    } catch (error) {
-      notifications.show({
-        title: 'Error',
-        message: 'Failed to delete property',
-        color: 'red',
-      });
-    }
-  };
-
   return (
     <>
       <Grid>
         {properties.map((property) => (
-          <Grid.Col key={property.id} span={{ base: 12, sm: 6, lg: 4 }}>
+          <Grid.Col key={property._id} span={{ base: 12, sm: 6, lg: 4 }}>
             <Card shadow="sm" padding="lg" radius="md" withBorder>
               <Group position="apart" mb="xs">
                 <Text fw={500}>{property.name}</Text>
@@ -72,13 +54,16 @@ export function PropertyList({ properties, onUpdate, onDelete }: PropertyListPro
               <Group position="apart" mt="md">
                 <ActionIcon 
                   color="blue" 
-                  onClick={() => setEditingProperty(property)}
+                  onClick={() => {
+                    console.log('Editing property:', property);
+                    setEditingProperty(property);
+                  }}
                 >
                   <IconPencil size={16} />
                 </ActionIcon>
                 <ActionIcon 
                   color="red" 
-                  onClick={() => handleDelete(property.id)}
+                  onClick={() => onDelete(property._id)}
                 >
                   <IconTrash size={16} />
                 </ActionIcon>

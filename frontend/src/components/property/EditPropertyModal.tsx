@@ -13,7 +13,11 @@ interface EditPropertyModalProps {
 
 export function EditPropertyModal({ property, opened, onClose, onUpdate }: EditPropertyModalProps) {
   const form = useForm<Property>({
-    initialValues: property,
+    initialValues: {
+      ...property,
+      amenities: property.amenities || [],
+      description: property.description || '',
+    },
     validate: {
       name: (value) => (!value ? 'Name is required' : null),
       address: (value) => (!value ? 'Address is required' : null),
@@ -24,7 +28,11 @@ export function EditPropertyModal({ property, opened, onClose, onUpdate }: EditP
 
   const handleSubmit = form.onSubmit(async (values) => {
     try {
-      const updatedProperty = await updateProperty(property.id, values);
+      if (!property._id) {
+        throw new Error('Property ID is missing');
+      }
+      
+      const updatedProperty = await updateProperty(property._id, values);
       notifications.show({
         title: 'Success',
         message: 'Property updated successfully',
@@ -32,10 +40,11 @@ export function EditPropertyModal({ property, opened, onClose, onUpdate }: EditP
       });
       onUpdate(updatedProperty);
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error updating property:', error);
       notifications.show({
         title: 'Error',
-        message: 'Failed to update property',
+        message: error.response?.data?.message || 'Failed to update property',
         color: 'red',
       });
     }

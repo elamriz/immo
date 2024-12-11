@@ -1,5 +1,5 @@
 export interface Property {
-  id: string;
+  _id: string;
   name: string;
   address: string;
   type: 'house' | 'apartment' | 'commercial';
@@ -11,6 +11,7 @@ export interface Property {
   status: 'available' | 'occupied' | 'maintenance';
   amenities: string[];
   images?: string[];
+  owner: string;
 }
 
-export interface CreatePropertyDto extends Omit<Property, 'id'> {} 
+export interface CreatePropertyDto extends Omit<Property, '_id' | 'owner'> {} 

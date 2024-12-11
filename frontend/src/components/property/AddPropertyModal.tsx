@@ -43,10 +43,11 @@ export function AddPropertyModal({ opened, onClose, onAdd }: AddPropertyModalPro
       onAdd(newProperty);
       onClose();
       form.reset();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error adding property:', error);
       notifications.show({
         title: 'Error',
-        message: 'Failed to add property',
+        message: error.response?.data?.message || 'Failed to add property',
         color: 'red',
       });
     }

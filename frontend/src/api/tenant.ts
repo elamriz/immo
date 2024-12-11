@@ -11,15 +11,21 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('auth-storage');
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    const parsedToken = JSON.parse(token).state.token;
+    config.headers.Authorization = `Bearer ${parsedToken}`;
   }
   return config;
 });
 
-export const getTenants = async (): Promise<Tenant[]> => {
-  const { data } = await api.get('/tenants');
+export const getTenants = async (propertyId: string): Promise<Tenant[]> => {
+  const { data } = await api.get(`/tenants?propertyId=${propertyId}`);
+  return data;
+};
+
+export const getTenantById = async (id: string): Promise<Tenant> => {
+  const { data } = await api.get(`/tenants/${id}`);
   return data;
 };
 
@@ -28,8 +34,8 @@ export const createTenant = async (tenant: CreateTenantDto): Promise<Tenant> => 
   return data;
 };
 
-export const updateTenant = async (id: string, tenant: Partial<Tenant>): Promise<Tenant> => {
-  const { data } = await api.patch(`/tenants/${id}`, tenant);
+export const updateTenant = async (tenant: Tenant): Promise<Tenant> => {
+  const { data } = await api.patch(`/tenants/${tenant._id}`, tenant);
   return data;
 };
 

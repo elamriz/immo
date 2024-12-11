@@ -4,6 +4,7 @@ import { LoginPage } from '../pages/auth/LoginPage';
 import { RegisterPage } from '../pages/auth/RegisterPage';
 import { Dashboard } from '../pages/Dashboard';
 import { MainLayout } from '../layouts/MainLayout';
+import { TenantsPage } from '../pages/TenantsPage';
 
 const AppRoutes = () => {
   const user = useAuthStore((state) => state.user);
@@ -19,6 +20,7 @@ const AppRoutes = () => {
       ) : (
         <Route element={<MainLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/tenants" element={<TenantsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       )}
