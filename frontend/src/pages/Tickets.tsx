@@ -1,6 +1,6 @@
-import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
-import { useState } from 'react';
+import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea, Tabs } from '@mantine/core';
+import { IconPlus, IconSortDescending, IconHome, IconAlertTriangle } from '@tabler/icons-react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTickets } from '../hooks/useTickets';
 import { useProperties } from '../hooks/useProperties';
 import { useForm } from '@mantine/form';
@@ -24,10 +24,59 @@ interface Ticket {
   createdAt: string;
 }
 
+interface Tenant {
+  _id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  propertyId: string;
+  leaseStartDate: Date;
+  leaseEndDate: Date;
+  rentAmount: number;
+  depositAmount: number;
+  status: 'pending' | 'active' | 'ended';
+  rentStatus: 'paid' | 'pending' | 'late';
+}
+
+interface Property {
+  _id: string;
+  name: string;
+  address: string;
+  type: 'house' | 'apartment' | 'commercial';
+  size: number;
+  numberOfRooms: number;
+  maxTenants: number;
+  rentAmount: number;
+  description?: string;
+  status: 'available' | 'occupied' | 'maintenance';
+  amenities: string[];
+  images?: string[];
+  owner: string;
+  tenants: {
+    userId: string;
+    firstName: string;
+    lastName: string;
+    leaseStartDate: string;
+    leaseEndDate: string;
+    rentAmount: number;
+    depositAmount: number;
+    status: 'active' | 'inactive';
+    rentStatus: 'pending' | 'paid';
+    _id: string;
+  }[];
+}
+
 export function Tickets() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
+  const [filterProperty, setFilterProperty] = useState<string | null>(null);
   const { tickets, isLoading, addTicket, updateTicket, deleteTicket } = useTickets();
   const { properties } = useProperties();
+
+  useEffect(() => {
+    console.log('Properties:', properties);
+  }, [properties]);
 
   const form = useForm({
     initialValues: {
@@ -50,7 +99,34 @@ export function Tickets() {
     },
   });
 
-  const selectedProperty = properties.find(p => p._id === form.values.propertyId);
+  useEffect(() => {
+    console.log('Form values:', form.values);
+    if (form.values.propertyId) {
+      const selectedProperty = properties.find(p => p._id === form.values.propertyId);
+      console.log('Selected property:', selectedProperty);
+      console.log('Tenants:', selectedProperty?.tenants);
+    }
+  }, [form.values, properties]);
+
+  // Tri et filtrage des tickets
+  const sortedAndFilteredTickets = useMemo(() => {
+    let filteredTickets = tickets;
+    
+    // Filtrer par propriété si sélectionnée
+    if (filterProperty) {
+      filteredTickets = filteredTickets.filter(t => t.propertyId._id === filterProperty);
+    }
+
+    // Trier les tickets
+    return [...filteredTickets].sort((a, b) => {
+      if (sortBy === 'date') {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else {
+        const priorityOrder = { high: 3, medium: 2, low: 1 };
+        return priorityOrder[b.priority] - priorityOrder[a.priority];
+      }
+    });
+  }, [tickets, sortBy, filterProperty]);
 
   const handleSubmit = (values: typeof form.values) => {
     addTicket(values);
@@ -74,12 +150,41 @@ export function Tickets() {
         </Button>
       </Group>
 
+      <Group mb="md">
+        <Select
+          placeholder="Filtrer par propriété"
+          data={[
+            { value: '', label: 'Toutes les propriétés' },
+            ...properties.map(p => ({ value: p._id, label: p.name }))
+          ]}
+          value={filterProperty}
+          onChange={setFilterProperty}
+          clearable
+          style={{ width: 200 }}
+        />
+        <Select
+          placeholder="Trier par"
+          data={[
+            { value: 'date', label: 'Date', icon: IconSortDescending },
+            { value: 'priority', label: 'Priorité', icon: IconAlertTriangle }
+          ]}
+          value={sortBy}
+          onChange={(value: 'date' | 'priority') => setSortBy(value)}
+          style={{ width: 150 }}
+        />
+      </Group>
+
       <Stack spacing="md">
-        {tickets.map((ticket) => (
+        {sortedAndFilteredTickets.map((ticket) => (
           <Paper key={ticket._id} p="md" withBorder>
             <Group position="apart">
               <div>
-                <Text weight={500}>{ticket.title}</Text>
+                <Group spacing="xs">
+                  <Text weight={500}>{ticket.title}</Text>
+                  {ticket.priority === 'high' && (
+                    <IconAlertTriangle size={16} color="red" />
+                  )}
+                </Group>
                 <Text size="sm" color="dimmed">
                   {ticket.description}
                 </Text>
@@ -113,15 +218,23 @@ export function Tickets() {
 
       <Modal
         opened={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          form.reset();
+        }}
         title="Nouveau ticket"
       >
         <form onSubmit={form.onSubmit(handleSubmit)}>
           <Select
             label="Propriété"
             placeholder="Sélectionnez une propriété"
-            data={properties.map((p) => ({ value: p._id, label: p.name }))}
+            data={properties.map(p => ({ value: p._id, label: p.name }))}
             {...form.getInputProps('propertyId')}
+            onChange={(value) => {
+              form.setFieldValue('propertyId', value);
+              form.setFieldValue('tenantId', '');
+              console.log('Property changed to:', value);
+            }}
             mb="md"
           />
 
@@ -133,17 +246,31 @@ export function Tickets() {
               { value: 'tenant_specific', label: 'Spécifique à un locataire' }
             ]}
             {...form.getInputProps('ticketType')}
+            onChange={(value) => {
+              form.setFieldValue('ticketType', value);
+              form.setFieldValue('tenantId', '');
+              console.log('Ticket type changed to:', value);
+            }}
             mb="md"
           />
 
-          {form.values.ticketType === 'tenant_specific' && selectedProperty && (
+          {form.values.ticketType === 'tenant_specific' && form.values.propertyId && (
             <Select
               label="Locataire"
               placeholder="Sélectionnez le locataire"
-              data={selectedProperty.tenants?.map((t) => ({
-                value: t.userId,
-                label: `${t.firstName} ${t.lastName}`
-              })) || []}
+              data={(() => {
+                const selectedProperty = properties.find(p => p._id === form.values.propertyId);
+                console.log('Selected property:', selectedProperty);
+                console.log('Tenants:', selectedProperty?.tenants);
+                const tenantOptions = selectedProperty?.tenants
+                  ?.filter(t => t.status === 'active' && t._id && t.firstName && t.lastName)
+                  ?.map((t) => ({
+                    value: t._id,
+                    label: `${t.firstName} ${t.lastName}`.trim()
+                  })) || [];
+                console.log('Tenant options:', tenantOptions);
+                return tenantOptions;
+              })()}
               {...form.getInputProps('tenantId')}
               mb="md"
             />
@@ -175,7 +302,10 @@ export function Tickets() {
           />
 
           <Group position="right">
-            <Button variant="subtle" onClick={() => setIsModalOpen(false)}>
+            <Button variant="subtle" onClick={() => {
+              setIsModalOpen(false);
+              form.reset();
+            }}>
               Annuler
             </Button>
             <Button type="submit">Créer</Button>

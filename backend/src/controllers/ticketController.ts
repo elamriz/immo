@@ -20,12 +20,20 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
     if (ticketType === 'tenant_specific' && tenantId) {
       const tenant = await Property.findOne({
         _id: propertyId,
-        'tenants.userId': tenantId
+        'tenants._id': tenantId
       });
 
       if (!tenant) {
         return res.status(400).json({ 
           message: 'Le locataire spécifié n\'est pas associé à cette propriété' 
+        });
+      }
+
+      // Trouver les informations du locataire
+      const tenantInfo = tenant.tenants.find(t => t._id.toString() === tenantId);
+      if (!tenantInfo) {
+        return res.status(400).json({ 
+          message: 'Informations du locataire introuvables' 
         });
       }
     }
@@ -45,8 +53,12 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
 
     const populatedTicket = await Ticket.findById(ticket._id)
       .populate('propertyId', 'name')
-      .populate('tenantId', 'firstName lastName');
+      .populate({
+        path: 'tenantId',
+        select: 'firstName lastName email'
+      });
 
+    console.log('Created ticket:', populatedTicket);
     return res.status(201).json(populatedTicket);
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -67,8 +79,14 @@ export const getTickets = async (req: Request, res: Response): Promise<Response>
       propertyId: { $in: propertyIds }
     })
     .populate('propertyId', 'name')
+    .populate({
+      path: 'tenantId',
+      select: 'firstName lastName email',
+      model: 'User'
+    })
     .sort({ createdAt: -1 });
 
+    console.log('Retrieved tickets:', JSON.stringify(tickets, null, 2));
     return res.json(tickets);
   } catch (error) {
     console.error('Error fetching tickets:', error);
@@ -102,7 +120,9 @@ export const updateTicket = async (req: Request, res: Response): Promise<Respons
       id,
       { ...req.body },
       { new: true }
-    ).populate('propertyId', 'name');
+    )
+    .populate('propertyId', 'name')
+    .populate('tenantId', 'firstName lastName');
 
     return res.json(updatedTicket);
   } catch (error) {

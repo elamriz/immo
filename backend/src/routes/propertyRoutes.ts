@@ -1,22 +1,29 @@
 import express from 'express';
 import { auth } from '../middleware/auth';
-import { 
+import {
   createProperty,
   getProperties,
   getPropertyById,
   updateProperty,
-  deleteProperty
+  deleteProperty,
+  addTenant,
+  updateTenant
 } from '../controllers/propertyController';
 
 const router = express.Router();
 
-// Toutes les routes nécessitent une authentification
+// Middleware d'authentification pour toutes les routes
 router.use(auth);
 
+// Routes de base pour les propriétés
 router.post('/', createProperty);
 router.get('/', getProperties);
 router.get('/:id', getPropertyById);
-router.patch('/:id', updateProperty);
+router.put('/:id', updateProperty);
 router.delete('/:id', deleteProperty);
+
+// Routes pour la gestion des locataires
+router.post('/:propertyId/tenants', addTenant);
+router.put('/:propertyId/tenants/:tenantId', updateTenant);
 
 export default router; 

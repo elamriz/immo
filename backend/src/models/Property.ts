@@ -1,5 +1,15 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+interface Tenant {
+  userId: mongoose.Types.ObjectId;
+  leaseStartDate: Date;
+  leaseEndDate?: Date;
+  rentAmount: number;
+  depositAmount: number;
+  status: 'active' | 'inactive';
+  rentStatus: 'pending' | 'paid';
+}
+
 export interface IProperty extends Document {
   name: string;
   address: string;
@@ -13,7 +23,7 @@ export interface IProperty extends Document {
   amenities: string[];
   images?: string[];
   owner: mongoose.Types.ObjectId;
-  tenants: mongoose.Types.ObjectId[];
+  tenants: Tenant[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,9 +53,37 @@ const propertySchema = new Schema<IProperty>({
     ref: 'User',
     required: true 
   },
-  tenants: [{ 
-    type: Schema.Types.ObjectId, 
-    ref: 'User' 
+  tenants: [{
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    leaseStartDate: {
+      type: Date,
+      required: true
+    },
+    leaseEndDate: {
+      type: Date
+    },
+    rentAmount: {
+      type: Number,
+      required: true
+    },
+    depositAmount: {
+      type: Number,
+      required: true
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active'
+    },
+    rentStatus: {
+      type: String,
+      enum: ['pending', 'paid'],
+      default: 'pending'
+    }
   }]
 }, {
   timestamps: true
