@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { Ticket } from '../models/Ticket';
 import { Property } from '../models/Property';
+import { Types } from 'mongoose';
 
 export const createTicket = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -20,7 +21,7 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
     if (ticketType === 'tenant_specific' && tenantId) {
       const tenant = await Property.findOne({
         _id: propertyId,
-        'tenants._id': tenantId
+        'tenants.userId': new Types.ObjectId(tenantId)
       });
 
       if (!tenant) {
@@ -30,7 +31,7 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
       }
 
       // Trouver les informations du locataire
-      const tenantInfo = tenant.tenants.find(t => t._id.toString() === tenantId);
+      const tenantInfo = tenant.tenants.find(t => t.userId.toString() === tenantId);
       if (!tenantInfo) {
         return res.status(400).json({ 
           message: 'Informations du locataire introuvables' 
