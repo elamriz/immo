@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { Tenant } from '../models/Tenant';
-import { Property } from '../models/Property';
-import mongoose from 'mongoose';
+import { Property, ITenant } from '../models/Property';
+import mongoose, { Types } from 'mongoose';
 
 export const createTenant = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -24,19 +24,19 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
     const property = await Property.findOne({
       _id: propertyId,
       owner: req.user._id
-    }).exec();
+    });
 
     if (!property) {
       return res.status(404).json({ message: 'Property not found or not authorized' });
     }
 
-    // Créer le locataire
+    // Créer le locataire dans la collection Tenant
     const tenant = new Tenant({
       firstName,
       lastName,
       email,
       phone,
-      propertyId,
+      propertyId: new Types.ObjectId(propertyId),
       leaseStartDate,
       leaseEndDate,
       rentAmount,
@@ -47,46 +47,25 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
 
     // Sauvegarder le locataire
     const savedTenant = await tenant.save();
-    console.log('Saved tenant:', JSON.stringify(savedTenant, null, 2));
+    console.log('Saved tenant:', savedTenant);
 
-    // Créer l'objet locataire pour la propriété
-    const tenantForProperty = {
-      userId: savedTenant._id,
+    // Créer l'objet locataire pour la propriété avec le type correct
+    const tenantForProperty: ITenant = {
+      userId: savedTenant._id as Types.ObjectId,
+      firstName: savedTenant.firstName,
+      lastName: savedTenant.lastName,
       leaseStartDate: new Date(leaseStartDate),
       leaseEndDate: new Date(leaseEndDate),
-      rentAmount,
-      depositAmount,
-      status: status === 'active' ? 'active' : 'inactive',
-      rentStatus: rentStatus || 'pending'
+      rentAmount: Number(rentAmount),
+      depositAmount: Number(depositAmount),
+      status: (status || 'active') as 'active' | 'inactive',
+      rentStatus: (rentStatus || 'pending') as 'pending' | 'paid'
     };
 
-    // D'abord, initialiser le tableau tenants s'il n'existe pas
-    await Property.updateOne(
-      { _id: propertyId },
-      { $setOnInsert: { tenants: [] } },
-      { upsert: true }
-    );
-
-    // Ensuite, mettre à jour la propriété avec le nouveau locataire
-    const updatedProperty = await Property.findByIdAndUpdate(
-      propertyId,
-      {
-        $push: { tenants: tenantForProperty },
-        $set: { status: 'occupied' }
-      },
-      { 
-        new: true,
-        runValidators: true
-      }
-    ).exec();
-
-    console.log('Updated property:', JSON.stringify(updatedProperty, null, 2));
-
-    if (!updatedProperty) {
-      // Si la mise à jour de la propriété échoue, supprimer le locataire créé
-      await Tenant.findByIdAndDelete(savedTenant._id);
-      return res.status(500).json({ message: 'Failed to update property with tenant' });
-    }
+    // Ajouter le tenant à la propriété
+    property.tenants.push(tenantForProperty);
+    property.status = 'occupied';
+    await property.save();
 
     // Retourner le locataire créé avec les informations de la propriété
     const populatedTenant = await Tenant.findById(savedTenant._id)

@@ -18,29 +18,13 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-interface Ticket {
-  _id: string;
-  title: string;
-  description: string;
-  status: 'open' | 'in_progress' | 'resolved';
-  priority: 'low' | 'medium' | 'high';
-  ticketType: 'general' | 'tenant_specific';
-  propertyId: {
-    _id: string;
-    name: string;
-  };
-  tenantId?: {
-    _id: string;
-    firstName: string;
-    lastName: string;
-  };
-  createdAt: string;
-}
+import { Ticket } from '../../types/ticket';
 
 interface TicketListProps {
   tickets: Ticket[];
-  onTicketClick: (ticketId: string) => void;
+  onView: (ticket: Ticket) => void;
+  onEdit: (ticket: Ticket) => void;
+  onDelete: (id: string) => void;
 }
 
 const getPriorityIcon = (priority: string) => {
@@ -82,72 +66,96 @@ const getStatusLabel = (status: string) => {
   }
 };
 
-export const TicketList: React.FC<TicketListProps> = ({ tickets, onTicketClick }) => {
+export function TicketList({ tickets, onView, onEdit, onDelete }: TicketListProps) {
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high':
+        return 'red';
+      case 'medium':
+        return 'yellow';
+      case 'low':
+        return 'green';
+      default:
+        return 'gray';
+    }
+  };
+
+  console.log('Rendering tickets:', tickets); // Debug log
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      {tickets.map((ticket) => (
-        <Card
-          key={ticket._id}
-          sx={{
-            cursor: 'pointer',
-            '&:hover': {
-              boxShadow: 3,
-            },
-          }}
-          onClick={() => onTicketClick(ticket._id)}
-        >
-          <CardContent>
-            <Grid container spacing={2} alignItems="center">
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Tooltip title={ticket.ticketType === 'general' ? "Ticket général" : "Ticket locataire"}>
-                    {ticket.ticketType === 'general' ? 
-                      <BuildingIcon color="primary" /> : 
-                      <TenantIcon color="secondary" />
-                    }
-                  </Tooltip>
-                  <Typography variant="h6" component="div">
-                    {ticket.title}
-                  </Typography>
-                </Box>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                  <Chip
-                    label={getStatusLabel(ticket.status)}
-                    color={getStatusColor(ticket.status) as any}
-                    size="small"
-                  />
-                  <Tooltip title={`Priorité ${ticket.priority}`}>
-                    <IconButton size="small">
-                      {getPriorityIcon(ticket.priority)}
-                    </IconButton>
-                  </Tooltip>
-                </Box>
-              </Grid>
+      {tickets.map((ticket) => {
+        console.log('Rendering ticket:', ticket); // Debug log pour chaque ticket
+        console.log('Tenant info:', ticket.tenantInfo); // Debug log pour les infos du tenant
 
-              <Grid item xs={12}>
-                <Typography variant="body2" color="text.secondary">
-                  {ticket.description}
-                </Typography>
-              </Grid>
+        return (
+          <Card
+            key={ticket._id}
+            sx={{
+              cursor: 'pointer',
+              '&:hover': {
+                boxShadow: 3,
+              },
+            }}
+            onClick={() => onView(ticket)}
+          >
+            <CardContent>
+              <Grid container spacing={2} alignItems="center">
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Tooltip title={ticket.ticketType === 'general' ? "Ticket général" : "Ticket locataire"}>
+                      {ticket.ticketType === 'general' ? 
+                        <BuildingIcon color="primary" /> : 
+                        <TenantIcon color="secondary" />
+                      }
+                    </Tooltip>
+                    <Typography variant="h6" component="div">
+                      {ticket.title}
+                    </Typography>
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <Chip
+                      label={getStatusLabel(ticket.status)}
+                      color={getStatusColor(ticket.status) as any}
+                      size="small"
+                    />
+                    <Tooltip title={`Priorité ${ticket.priority}`}>
+                      <IconButton size="small">
+                        {getPriorityIcon(ticket.priority)}
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Grid>
 
-              <Grid item xs={12}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Grid item xs={12}>
                   <Typography variant="body2" color="text.secondary">
-                    {ticket.propertyId.name}
-                    {ticket.tenantId && ` - ${ticket.tenantId.firstName} ${ticket.tenantId.lastName}`}
+                    {ticket.description}
                   </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    {format(new Date(ticket.createdAt), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
-                  </Typography>
-                </Box>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {ticket.propertyId.name}
+                      {ticket.ticketType === 'tenant_specific' && ticket.tenantInfo && (
+                        <span style={{ marginLeft: '8px' }}>
+                          - {ticket.tenantInfo.firstName} {ticket.tenantInfo.lastName}
+                        </span>
+                      )}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {format(new Date(ticket.createdAt), "d MMMM yyyy 'à' HH:mm", { locale: fr })}
+                    </Typography>
+                  </Box>
+                </Grid>
               </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        );
+      })}
     </Box>
   );
-}; 
+} 

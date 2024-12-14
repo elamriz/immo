@@ -1,11 +1,21 @@
 import { Request, Response } from 'express';
 import { Ticket } from '../models/Ticket';
 import { Property } from '../models/Property';
+import { Tenant } from '../models/Tenant';
 import { Types } from 'mongoose';
 
 export const createTicket = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { propertyId, title, description, priority, ticketType, tenantId } = req.body;
+    
+    console.log('Creating ticket with data:', {
+      propertyId,
+      title,
+      description,
+      priority,
+      ticketType,
+      tenantId
+    });
 
     // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
@@ -14,50 +24,52 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
     });
 
     if (!property) {
+      console.log('Property not found:', { propertyId, userId: req.user._id });
       return res.status(404).json({ message: 'Property not found' });
     }
 
     // Vérifier que le locataire existe et est lié à la propriété si c'est un ticket spécifique
     if (ticketType === 'tenant_specific' && tenantId) {
-      const tenant = await Property.findOne({
-        _id: propertyId,
-        'tenants.userId': new Types.ObjectId(tenantId)
+      console.log('Checking tenant:', { tenantId, propertyId });
+      
+      // Vérifier d'abord dans la collection Tenant
+      const tenant = await Tenant.findOne({
+        _id: tenantId,
+        propertyId: propertyId,
+        status: 'active'
       });
 
       if (!tenant) {
+        console.log('Tenant not found or not active:', { tenantId, propertyId });
         return res.status(400).json({ 
-          message: 'Le locataire spécifié n\'est pas associé à cette propriété' 
-        });
-      }
-
-      // Trouver les informations du locataire
-      const tenantInfo = tenant.tenants.find(t => t.userId.toString() === tenantId);
-      if (!tenantInfo) {
-        return res.status(400).json({ 
-          message: 'Informations du locataire introuvables' 
+          message: 'Le locataire spécifié n\'est pas associé à cette propriété ou n\'est pas actif',
+          details: {
+            tenantId,
+            propertyId,
+            ticketType
+          }
         });
       }
     }
 
     const ticketData = {
-      propertyId,
+      propertyId: new Types.ObjectId(propertyId),
       title,
       description,
       priority,
       status: 'open',
       ticketType,
-      ...(tenantId && { tenantId }) // Ajoute tenantId seulement s'il est fourni
+      ...(tenantId && { tenantId: new Types.ObjectId(tenantId) })
     };
+
+    console.log('Creating ticket with data:', ticketData);
 
     const ticket = new Ticket(ticketData);
     await ticket.save();
 
     const populatedTicket = await Ticket.findById(ticket._id)
       .populate('propertyId', 'name')
-      .populate({
-        path: 'tenantId',
-        select: 'firstName lastName email'
-      });
+      .populate('tenantId', 'firstName lastName email');
 
     console.log('Created ticket:', populatedTicket);
     return res.status(201).json(populatedTicket);
@@ -72,23 +84,58 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
 
 export const getTickets = async (req: Request, res: Response): Promise<Response> => {
   try {
-    // Récupérer toutes les propriétés de l'utilisateur
-    const properties = await Property.find({ owner: req.user._id });
+    const properties = await Property.find({ owner: req.user._id }).lean();
     const propertyIds = properties.map(p => p._id);
 
     const tickets = await Ticket.find({
       propertyId: { $in: propertyIds }
     })
     .populate('propertyId', 'name')
-    .populate({
-      path: 'tenantId',
-      select: 'firstName lastName email',
-      model: 'User'
-    })
-    .sort({ createdAt: -1 });
+    .lean();
 
-    console.log('Retrieved tickets:', JSON.stringify(tickets, null, 2));
-    return res.json(tickets);
+    // Récupérer tous les tenants une seule fois
+    const tenantIds = tickets
+      .filter(ticket => ticket.ticketType === 'tenant_specific' && ticket.tenantId)
+      .map(ticket => ticket.tenantId);
+
+    const tenants = await Tenant.find({
+      _id: { $in: tenantIds }
+    }).lean();
+
+    // Créer un Map pour un accès rapide aux tenants
+    const tenantsMap = new Map(
+      tenants.map(tenant => [tenant._id.toString(), tenant])
+    );
+
+    // Enrichir les tickets avec les informations du tenant
+    const enrichedTickets = tickets.map((ticket) => {
+      if (ticket.ticketType === 'tenant_specific' && ticket.tenantId) {
+        const tenant = tenantsMap.get(ticket.tenantId.toString());
+        
+        if (tenant) {
+          console.log('Found tenant:', tenant);
+          return {
+            ...ticket,
+            tenantInfo: {
+              firstName: tenant.firstName,
+              lastName: tenant.lastName
+            }
+          };
+        }
+      }
+      return ticket;
+    });
+
+    // Log final enriched tickets
+    console.log('Final enriched tickets:', enrichedTickets.map(ticket => ({
+      _id: ticket._id,
+      tenantId: ticket.tenantId,
+      tenantInfo: ticket.tenantInfo,
+      ticketType: ticket.ticketType,
+      propertyId: ticket.propertyId._id
+    })));
+
+    return res.json(enrichedTickets);
   } catch (error) {
     console.error('Error fetching tickets:', error);
     return res.status(500).json({

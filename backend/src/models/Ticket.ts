@@ -20,6 +20,10 @@ export interface ITicket extends Document {
     performedBy: mongoose.Types.ObjectId;
     timestamp: Date;
   }[];
+  tenantInfo?: {
+    firstName: string;
+    lastName: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }

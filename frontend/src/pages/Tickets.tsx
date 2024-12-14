@@ -1,9 +1,12 @@
-import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea, Tabs } from '@mantine/core';
+import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea } from '@mantine/core';
 import { IconPlus, IconSortDescending, IconHome, IconAlertTriangle } from '@tabler/icons-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useTickets } from '../hooks/useTickets';
-import { useProperties } from '../hooks/useProperties';
 import { useForm } from '@mantine/form';
+import { useQuery } from 'react-query';
+import { getProperties, getTenants } from '../api/properties';
+import { Property } from '../types/property';
+import { Tenant } from '../types/tenant';
 
 interface Ticket {
   _id: string;
@@ -22,49 +25,10 @@ interface Ticket {
     lastName: string;
   };
   createdAt: string;
-}
-
-interface Tenant {
-  _id: string;
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  propertyId: string;
-  leaseStartDate: Date;
-  leaseEndDate: Date;
-  rentAmount: number;
-  depositAmount: number;
-  status: 'pending' | 'active' | 'ended';
-  rentStatus: 'paid' | 'pending' | 'late';
-}
-
-interface Property {
-  _id: string;
-  name: string;
-  address: string;
-  type: 'house' | 'apartment' | 'commercial';
-  size: number;
-  numberOfRooms: number;
-  maxTenants: number;
-  rentAmount: number;
-  description?: string;
-  status: 'available' | 'occupied' | 'maintenance';
-  amenities: string[];
-  images?: string[];
-  owner: string;
-  tenants: {
-    userId: string;
+  tenantInfo?: {
     firstName: string;
     lastName: string;
-    leaseStartDate: string;
-    leaseEndDate: string;
-    rentAmount: number;
-    depositAmount: number;
-    status: 'active' | 'inactive';
-    rentStatus: 'pending' | 'paid';
-    _id: string;
-  }[];
+  };
 }
 
 export function Tickets() {
@@ -72,32 +36,55 @@ export function Tickets() {
   const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
   const [filterProperty, setFilterProperty] = useState<string | null>(null);
   const { tickets, isLoading, addTicket, updateTicket, deleteTicket } = useTickets();
-  const { properties } = useProperties();
-
-  useEffect(() => {
-    console.log('Properties:', properties);
-  }, [properties]);
 
   const form = useForm({
     initialValues: {
       propertyId: '',
       title: '',
       description: '',
-      priority: 'medium' as 'low' | 'medium' | 'high',
-      ticketType: 'general' as 'general' | 'tenant_specific',
+      priority: 'medium' as const,
+      ticketType: 'general' as const,
       tenantId: ''
-    },
-    validate: {
-      propertyId: (value) => (!value ? 'Sélectionnez une propriété' : null),
-      title: (value) => (!value ? 'Le titre est requis' : null),
-      description: (value) => (!value ? 'La description est requise' : null),
-      tenantId: (value, values) => (
-        values.ticketType === 'tenant_specific' && !value 
-          ? 'Le locataire est requis pour un ticket spécifique' 
-          : null
-      ),
-    },
+    }
   });
+
+  const { data: properties = [] } = useQuery('properties', getProperties);
+  const { data: tenants = [] } = useQuery(
+    ['tenants', form.values.propertyId],
+    () => getTenants(form.values.propertyId),
+    { enabled: !!form.values.propertyId }
+  );
+
+  const selectedProperty = properties.find(p => p._id === form.values.propertyId);
+
+  // Transformer les tenants pour utiliser leur userId au lieu de leur _id
+  const tenantOptions = tenants.map(tenant => ({
+    value: tenant._id,
+    label: `${tenant.firstName} ${tenant.lastName}`
+  }));
+
+  const handleSubmit = async (values: typeof form.values) => {
+    try {
+      // Si c'est un ticket spécifique à un tenant, trouver le tenant correspondant
+      let tenantUserId = values.tenantId;
+      if (values.ticketType === 'tenant_specific' && values.tenantId) {
+        const tenant = tenants.find(t => t._id === values.tenantId);
+        if (tenant) {
+          tenantUserId = tenant._id;
+        }
+      }
+
+      await addTicket({
+        ...values,
+        tenantId: tenantUserId
+      });
+      
+      setIsModalOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   useEffect(() => {
     console.log('Form values:', form.values);
@@ -127,12 +114,6 @@ export function Tickets() {
       }
     });
   }, [tickets, sortBy, filterProperty]);
-
-  const handleSubmit = (values: typeof form.values) => {
-    addTicket(values);
-    setIsModalOpen(false);
-    form.reset();
-  };
 
   const handleStatusChange = (ticketId: string, status: 'open' | 'in_progress' | 'resolved') => {
     updateTicket({ id: ticketId, status });
@@ -190,7 +171,9 @@ export function Tickets() {
                 </Text>
                 <Text size="xs" color="dimmed">
                   {ticket.propertyId.name}
-                  {ticket.tenantId && ` - ${ticket.tenantId.firstName} ${ticket.tenantId.lastName}`}
+                  {ticket.ticketType === 'tenant_specific' && ticket.tenantInfo && (
+                    ` - ${ticket.tenantInfo.firstName} ${ticket.tenantInfo.lastName}`
+                  )}
                 </Text>
               </div>
               <Group>
@@ -258,19 +241,7 @@ export function Tickets() {
             <Select
               label="Locataire"
               placeholder="Sélectionnez le locataire"
-              data={(() => {
-                const selectedProperty = properties.find(p => p._id === form.values.propertyId);
-                console.log('Selected property:', selectedProperty);
-                console.log('Tenants:', selectedProperty?.tenants);
-                const tenantOptions = selectedProperty?.tenants
-                  ?.filter(t => t.status === 'active' && t._id && t.firstName && t.lastName)
-                  ?.map((t) => ({
-                    value: t._id,
-                    label: `${t.firstName} ${t.lastName}`.trim()
-                  })) || [];
-                console.log('Tenant options:', tenantOptions);
-                return tenantOptions;
-              })()}
+              data={tenantOptions}
               {...form.getInputProps('tenantId')}
               mb="md"
             />

@@ -1,7 +1,9 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
-interface Tenant {
+export interface ITenant {
   userId: mongoose.Types.ObjectId;
+  firstName: string;
+  lastName: string;
   leaseStartDate: Date;
   leaseEndDate?: Date;
   rentAmount: number;
@@ -23,7 +25,7 @@ export interface IProperty extends Document {
   amenities: string[];
   images?: string[];
   owner: mongoose.Types.ObjectId;
-  tenants: Tenant[];
+  tenants: ITenant[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +59,14 @@ const propertySchema = new Schema<IProperty>({
     userId: {
       type: Schema.Types.ObjectId,
       ref: 'User',
+      required: true
+    },
+    firstName: {
+      type: String,
+      required: true
+    },
+    lastName: {
+      type: String,
       required: true
     },
     leaseStartDate: {

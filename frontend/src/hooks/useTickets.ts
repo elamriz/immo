@@ -16,6 +16,7 @@ const getTickets = async (): Promise<Ticket[]> => {
 };
 
 const createTicket = async (ticket: CreateTicketDto): Promise<Ticket> => {
+  console.log('Creating ticket with data:', ticket);
   const { data } = await axiosInstance.post('/tickets', ticket);
   return data;
 };
