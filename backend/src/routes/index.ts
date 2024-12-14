@@ -3,6 +3,7 @@ import authRoutes from './authRoutes';
 import propertyRoutes from './propertyRoutes';
 import tenantRoutes from './tenantRoutes';
 import paymentRoutes from './paymentRoutes';
+import ticketRoutes from './ticketRoutes';
 
 const router = express.Router();
 
@@ -13,5 +14,6 @@ router.use('/auth', authRoutes);
 router.use('/properties', propertyRoutes);
 router.use('/tenants', tenantRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/tickets', ticketRoutes);
 
 export default router; 

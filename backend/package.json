@@ -1,39 +1,40 @@
 {
   "name": "immo-backend",
   "version": "1.0.0",
-  "description": "Backend for real estate management application",
-  "main": "dist/server.js",
+  "private": true,
   "scripts": {
-    "start": "node dist/server.js",
-    "dev": "ts-node-dev --respawn src/server.ts",
+    "start": "node dist/index.js",
     "build": "tsc",
-    "lint": "eslint . --ext .ts",
-    "test": "jest"
+    "dev": "ts-node src/index.ts",
+    "lint": "eslint . --ext .ts"
   },
   "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.0.3",
-    "express": "^4.18.2",
-    "express-validator": "^7.0.1",
-    "google-auth-library": "^9.0.0",
-    "jsonwebtoken": "^9.0.0",
-    "mongoose": "^7.0.3",
-    "nodemailer": "^6.9.1"
+    "express": "4.18.2",
+    "mongoose": "8.0.0",
+    "cors": "2.8.5",
+    "dotenv": "16.3.1",
+    "lru-cache": "10.0.0",
+    "jsonwebtoken": "9.0.0",
+    "google-auth-library": "9.0.0",
+    "bcryptjs": "2.4.3",
+    "express-validator": "7.0.1",
+    "multer": "1.4.5-lts.1"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.2",
-    "@types/cors": "^2.8.13",
-    "@types/express": "^4.17.17",
-    "@types/jsonwebtoken": "^9.0.1",
-    "@types/node": "^18.15.11",
-    "@types/nodemailer": "^6.4.7",
-    "@typescript-eslint/eslint-plugin": "^5.57.1",
-    "@typescript-eslint/parser": "^5.57.1",
-    "eslint": "^8.37.0",
-    "nodemon": "^2.0.22",
-    "ts-node": "^10.9.1",
-    "ts-node-dev": "^2.0.0",
-    "typescript": "^5.0.3"
+    "@types/cors": "2.8.17",
+    "@types/express": "4.17.21",
+    "@types/jsonwebtoken": "9.0.0",
+    "@types/node": "20.0.0",
+    "@types/bcryptjs": "2.4.6",
+    "@types/multer": "1.4.7",
+    "@typescript-eslint/eslint-plugin": "6.0.0",
+    "@typescript-eslint/parser": "6.0.0",
+    "@eslint/config-array": "0.19.1",
+    "@eslint/object-schema": "2.1.5",
+    "eslint": "8.56.0",
+    "glob": "10.0.0",
+    "rimraf": "5.0.0",
+    "typescript": "5.0.4",
+    "ts-node": "10.9.0"
   }
 }

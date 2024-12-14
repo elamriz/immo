@@ -1,77 +1,187 @@
-import { Container, Title, Button, Group, Paper, Stack, Text, Select } from '@mantine/core';
+import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { notifications } from '@mantine/notifications';
+import { useTickets } from '../hooks/useTickets';
 import { useProperties } from '../hooks/useProperties';
+import { useForm } from '@mantine/form';
 
-// TODO: Créer ces types et API endpoints
 interface Ticket {
   _id: string;
-  propertyId: string;
   title: string;
   description: string;
   status: 'open' | 'in_progress' | 'resolved';
   priority: 'low' | 'medium' | 'high';
-  createdAt: Date;
-  updatedAt: Date;
+  ticketType: 'general' | 'tenant_specific';
+  propertyId: {
+    _id: string;
+    name: string;
+  };
+  tenantId?: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  createdAt: string;
 }
 
 export function Tickets() {
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { tickets, isLoading, addTicket, updateTicket, deleteTicket } = useTickets();
   const { properties } = useProperties();
 
-  // TODO: Implémenter la logique de gestion des tickets
-  const tickets: Ticket[] = [];
+  const form = useForm({
+    initialValues: {
+      propertyId: '',
+      title: '',
+      description: '',
+      priority: 'medium' as 'low' | 'medium' | 'high',
+      ticketType: 'general' as 'general' | 'tenant_specific',
+      tenantId: ''
+    },
+    validate: {
+      propertyId: (value) => (!value ? 'Sélectionnez une propriété' : null),
+      title: (value) => (!value ? 'Le titre est requis' : null),
+      description: (value) => (!value ? 'La description est requise' : null),
+      tenantId: (value, values) => (
+        values.ticketType === 'tenant_specific' && !value 
+          ? 'Le locataire est requis pour un ticket spécifique' 
+          : null
+      ),
+    },
+  });
+
+  const selectedProperty = properties.find(p => p._id === form.values.propertyId);
+
+  const handleSubmit = (values: typeof form.values) => {
+    addTicket(values);
+    setIsModalOpen(false);
+    form.reset();
+  };
+
+  const handleStatusChange = (ticketId: string, status: 'open' | 'in_progress' | 'resolved') => {
+    updateTicket({ id: ticketId, status });
+  };
 
   return (
-    <Container size="xl">
-      <Group justify="space-between" mb="xl">
+    <Container size="lg">
+      <Group position="apart" mb="xl">
         <Title>Tickets</Title>
-        <Group>
-          <Select
-            placeholder="Sélectionner une propriété"
-            data={properties.map(p => ({ value: p._id, label: p.name }))}
-            value={selectedPropertyId}
-            onChange={setSelectedPropertyId}
-            clearable
-          />
-          <Button
-            leftSection={<IconPlus size={20} />}
-            onClick={() => {
-              // TODO: Implémenter l'ajout de ticket
-            }}
-            disabled={!selectedPropertyId}
-          >
-            Nouveau ticket
-          </Button>
-        </Group>
+        <Button
+          leftIcon={<IconPlus size={16} />}
+          onClick={() => setIsModalOpen(true)}
+        >
+          Nouveau ticket
+        </Button>
       </Group>
 
-      {tickets.length === 0 ? (
-        <Paper p="xl" withBorder>
-          <Stack align="center" gap="xl">
-            <Title order={2}>Aucun ticket</Title>
-            <Text c="dimmed">
-              Aucun ticket n'a été créé pour le moment.
-            </Text>
-            <Button
-              leftSection={<IconPlus size={20} />}
-              onClick={() => {
-                // TODO: Implémenter l'ajout de ticket
-              }}
-              disabled={!selectedPropertyId}
-            >
-              Créer un ticket
+      <Stack spacing="md">
+        {tickets.map((ticket) => (
+          <Paper key={ticket._id} p="md" withBorder>
+            <Group position="apart">
+              <div>
+                <Text weight={500}>{ticket.title}</Text>
+                <Text size="sm" color="dimmed">
+                  {ticket.description}
+                </Text>
+                <Text size="xs" color="dimmed">
+                  {ticket.propertyId.name}
+                  {ticket.tenantId && ` - ${ticket.tenantId.firstName} ${ticket.tenantId.lastName}`}
+                </Text>
+              </div>
+              <Group>
+                <Select
+                  value={ticket.status}
+                  onChange={(value) => handleStatusChange(ticket._id, value as any)}
+                  data={[
+                    { value: 'open', label: 'Ouvert' },
+                    { value: 'in_progress', label: 'En cours' },
+                    { value: 'resolved', label: 'Résolu' },
+                  ]}
+                />
+                <Button
+                  color="red"
+                  variant="subtle"
+                  onClick={() => deleteTicket(ticket._id)}
+                >
+                  Supprimer
+                </Button>
+              </Group>
+            </Group>
+          </Paper>
+        ))}
+      </Stack>
+
+      <Modal
+        opened={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Nouveau ticket"
+      >
+        <form onSubmit={form.onSubmit(handleSubmit)}>
+          <Select
+            label="Propriété"
+            placeholder="Sélectionnez une propriété"
+            data={properties.map((p) => ({ value: p._id, label: p.name }))}
+            {...form.getInputProps('propertyId')}
+            mb="md"
+          />
+
+          <Select
+            label="Type de ticket"
+            placeholder="Sélectionnez le type de ticket"
+            data={[
+              { value: 'general', label: 'Général (tout l\'immeuble)' },
+              { value: 'tenant_specific', label: 'Spécifique à un locataire' }
+            ]}
+            {...form.getInputProps('ticketType')}
+            mb="md"
+          />
+
+          {form.values.ticketType === 'tenant_specific' && selectedProperty && (
+            <Select
+              label="Locataire"
+              placeholder="Sélectionnez le locataire"
+              data={selectedProperty.tenants?.map((t) => ({
+                value: t.userId,
+                label: `${t.firstName} ${t.lastName}`
+              })) || []}
+              {...form.getInputProps('tenantId')}
+              mb="md"
+            />
+          )}
+
+          <TextInput
+            label="Titre"
+            placeholder="Titre du ticket"
+            {...form.getInputProps('title')}
+            mb="md"
+          />
+
+          <Textarea
+            label="Description"
+            placeholder="Description du problème"
+            {...form.getInputProps('description')}
+            mb="md"
+          />
+
+          <Select
+            label="Priorité"
+            data={[
+              { value: 'low', label: 'Basse' },
+              { value: 'medium', label: 'Moyenne' },
+              { value: 'high', label: 'Haute' },
+            ]}
+            {...form.getInputProps('priority')}
+            mb="xl"
+          />
+
+          <Group position="right">
+            <Button variant="subtle" onClick={() => setIsModalOpen(false)}>
+              Annuler
             </Button>
-          </Stack>
-        </Paper>
-      ) : (
-        // TODO: Implémenter l'affichage des tickets
-        <Paper p="xl" withBorder>
-          <Text>Liste des tickets à implémenter</Text>
-        </Paper>
-      )}
+            <Button type="submit">Créer</Button>
+          </Group>
+        </form>
+      </Modal>
     </Container>
   );
 } 
