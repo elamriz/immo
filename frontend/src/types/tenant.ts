@@ -9,9 +9,20 @@ export interface Tenant {
   leaseEndDate: Date;
   rentAmount: number;
   depositAmount: number;
-  status: 'active' | 'pending' | 'ended';
+  status: 'pending' | 'active' | 'ended';
   rentStatus: 'paid' | 'pending' | 'late';
-  documents?: string[];
 }
 
-export interface CreateTenantDto extends Omit<Tenant, '_id'> {} 
+export interface CreateTenantDto {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  propertyId: string;
+  leaseStartDate: Date;
+  leaseEndDate: Date;
+  rentAmount: number;
+  depositAmount: number;
+  status: 'pending' | 'active' | 'ended';
+  rentStatus: 'paid' | 'pending' | 'late';
+} 

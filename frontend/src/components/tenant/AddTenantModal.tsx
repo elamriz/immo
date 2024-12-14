@@ -24,15 +24,14 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
       depositAmount: 0,
       status: 'pending',
       rentStatus: 'pending',
-      documents: [],
     },
     validate: {
-      firstName: (value) => (!value ? 'First name is required' : null),
-      lastName: (value) => (!value ? 'Last name is required' : null),
-      email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
-      phone: (value) => (!value ? 'Phone number is required' : null),
-      rentAmount: (value) => (value <= 0 ? 'Rent amount must be greater than 0' : null),
-      depositAmount: (value) => (value <= 0 ? 'Deposit amount must be greater than 0' : null),
+      firstName: (value) => (!value ? 'Le prénom est requis' : null),
+      lastName: (value) => (!value ? 'Le nom est requis' : null),
+      email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Email invalide'),
+      phone: (value) => (!value ? 'Le téléphone est requis' : null),
+      rentAmount: (value) => (value <= 0 ? 'Le montant du loyer doit être supérieur à 0' : null),
+      depositAmount: (value) => (value <= 0 ? 'Le montant de la caution doit être supérieur à 0' : null),
     },
   });
 
@@ -46,21 +45,21 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
     <Modal
       opened={opened}
       onClose={onClose}
-      title="Add New Tenant"
+      title="Ajouter un locataire"
       size="lg"
     >
       <form onSubmit={handleSubmit}>
         <Group grow>
           <TextInput
             required
-            label="First Name"
-            placeholder="John"
+            label="Prénom"
+            placeholder="Jean"
             {...form.getInputProps('firstName')}
           />
           <TextInput
             required
-            label="Last Name"
-            placeholder="Doe"
+            label="Nom"
+            placeholder="Dupont"
             {...form.getInputProps('lastName')}
           />
         </Group>
@@ -69,13 +68,13 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
           <TextInput
             required
             label="Email"
-            placeholder="john@example.com"
+            placeholder="jean.dupont@example.com"
             {...form.getInputProps('email')}
           />
           <TextInput
             required
-            label="Phone"
-            placeholder="+1234567890"
+            label="Téléphone"
+            placeholder="0612345678"
             {...form.getInputProps('phone')}
           />
         </Group>
@@ -83,12 +82,12 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
         <Group grow mt="md">
           <DateInput
             required
-            label="Lease Start Date"
+            label="Début du bail"
             {...form.getInputProps('leaseStartDate')}
           />
           <DateInput
             required
-            label="Lease End Date"
+            label="Fin du bail"
             minDate={new Date(form.values.leaseStartDate)}
             {...form.getInputProps('leaseEndDate')}
           />
@@ -97,13 +96,15 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
         <Group grow mt="md">
           <NumberInput
             required
-            label="Monthly Rent"
+            label="Loyer mensuel"
+            suffix=" €"
             min={0}
             {...form.getInputProps('rentAmount')}
           />
           <NumberInput
             required
-            label="Security Deposit"
+            label="Dépôt de garantie"
+            suffix=" €"
             min={0}
             {...form.getInputProps('depositAmount')}
           />
@@ -111,18 +112,18 @@ export function AddTenantModal({ opened, onClose, onAdd, propertyId }: AddTenant
 
         <Select
           mt="md"
-          label="Status"
+          label="Statut"
           data={[
-            { value: 'pending', label: 'Pending' },
-            { value: 'active', label: 'Active' },
-            { value: 'ended', label: 'Ended' },
+            { value: 'pending', label: 'En attente' },
+            { value: 'active', label: 'Actif' },
+            { value: 'ended', label: 'Terminé' },
           ]}
           {...form.getInputProps('status')}
         />
 
         <Group justify="flex-end" mt="xl">
-          <Button variant="light" onClick={onClose}>Cancel</Button>
-          <Button type="submit">Add Tenant</Button>
+          <Button variant="light" onClick={onClose}>Annuler</Button>
+          <Button type="submit">Ajouter</Button>
         </Group>
       </form>
     </Modal>

@@ -1,7 +1,17 @@
+import { Tenant } from './tenant';
+import { Property } from './property';
+
 export interface Payment {
-  id: string;
-  tenantId: string;
-  propertyId: string;
+  _id: string;
+  tenantId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+  };
+  propertyId: {
+    _id: string;
+    name: string;
+  };
   amount: number;
   dueDate: Date;
   paidDate?: Date;
@@ -10,4 +20,12 @@ export interface Payment {
   reference?: string;
 }
 
-export interface CreatePaymentDto extends Omit<Payment, 'id'> {} 
+export interface CreatePaymentDto {
+  tenantId: string;
+  propertyId: string;
+  amount: number;
+  dueDate: Date;
+  status: 'pending' | 'paid' | 'late';
+  paymentMethod?: 'bank_transfer' | 'cash' | 'check';
+  reference?: string;
+} 

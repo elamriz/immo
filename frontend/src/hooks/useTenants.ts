@@ -1,77 +1,80 @@
 import { useQuery, useMutation, useQueryClient } from 'react-query';
-import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/tenant';
 import { notifications } from '@mantine/notifications';
+import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/tenant';
+import { Tenant, CreateTenantDto } from '../types/tenant';
 
 export function useTenants(propertyId: string | null) {
   const queryClient = useQueryClient();
 
   const { data: tenants = [], isLoading } = useQuery(
     ['tenants', propertyId],
-    () => getTenants(propertyId!),
+    () => propertyId ? getTenants(propertyId) : Promise.resolve([]),
     {
-      enabled: !!propertyId,
+      enabled: !!propertyId
     }
   );
 
-  const updateMutation = useMutation(updateTenant, {
-    onSuccess: () => {
-      queryClient.invalidateQueries(['tenants', propertyId]);
-      notifications.show({
-        title: 'Success',
-        message: 'Tenant updated successfully',
-        color: 'green',
-      });
-    },
-    onError: (error: any) => {
-      notifications.show({
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to update tenant',
-        color: 'red',
-      });
-    },
-  });
+  const addTenant = useMutation(
+    (newTenant: CreateTenantDto) => createTenant(newTenant),
+    {
+      onSuccess: (tenant) => {
+        queryClient.setQueryData(['tenants', tenant.propertyId], 
+          (old: Tenant[] = []) => [...old, tenant]
+        );
+        notifications.show({
+          title: 'Succès',
+          message: 'Locataire ajouté avec succès',
+          color: 'green',
+        });
+      },
+      onError: (error: any) => {
+        notifications.show({
+          title: 'Erreur',
+          message: error.response?.data?.message || 'Erreur lors de l\'ajout du locataire',
+          color: 'red',
+        });
+      },
+    }
+  );
 
-  const addMutation = useMutation(createTenant, {
-    onSuccess: () => {
-      queryClient.invalidateQueries(['tenants', propertyId]);
-      notifications.show({
-        title: 'Success',
-        message: 'Tenant added successfully',
-        color: 'green',
-      });
-    },
-    onError: (error: any) => {
-      notifications.show({
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to add tenant',
-        color: 'red',
-      });
-    },
-  });
+  const updateTenantMutation = useMutation(
+    (data: { id: string; tenant: Partial<Tenant> }) => 
+      updateTenant(data.id, data.tenant),
+    {
+      onSuccess: (updatedTenant) => {
+        queryClient.setQueryData(['tenants', updatedTenant.propertyId],
+          (old: Tenant[] = []) => old.map(t => 
+            t._id === updatedTenant._id ? updatedTenant : t
+          )
+        );
+        notifications.show({
+          title: 'Succès',
+          message: 'Locataire mis à jour avec succès',
+          color: 'green',
+        });
+      },
+    }
+  );
 
-  const deleteMutation = useMutation(deleteTenant, {
-    onSuccess: () => {
-      queryClient.invalidateQueries(['tenants', propertyId]);
-      notifications.show({
-        title: 'Success',
-        message: 'Tenant deleted successfully',
-        color: 'green',
-      });
-    },
-    onError: (error: any) => {
-      notifications.show({
-        title: 'Error',
-        message: error.response?.data?.message || 'Failed to delete tenant',
-        color: 'red',
-      });
-    },
-  });
+  const deleteTenantMutation = useMutation(
+    (id: string) => deleteTenant(id),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries(['tenants', propertyId]);
+        notifications.show({
+          title: 'Succès',
+          message: 'Locataire supprimé avec succès',
+          color: 'green',
+        });
+      },
+    }
+  );
 
   return {
     tenants,
     isLoading,
-    updateTenant: updateMutation.mutate,
-    addTenant: addMutation.mutate,
-    deleteTenant: deleteMutation.mutate,
+    addTenant: addTenant.mutate,
+    updateTenant: updateTenantMutation.mutate,
+    deleteTenant: deleteTenantMutation.mutate,
   };
 } 

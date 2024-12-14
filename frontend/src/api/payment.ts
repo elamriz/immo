@@ -1,38 +1,40 @@
-import axios from 'axios';
+import { axiosInstance } from './axios';
 import { Payment, CreatePaymentDto } from '../types/payment';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+export const createPayment = async (payment: CreatePaymentDto): Promise<Payment> => {
+  try {
+    console.log('Tentative de création du paiement:', payment);
+    const response = await axiosInstance.post('/payments', {
+      ...payment,
+      dueDate: payment.dueDate.toISOString(),
+    });
+    console.log('Réponse du serveur:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Erreur détaillée:', {
+      error,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    throw error;
   }
-  return config;
-});
-
-export const getPayments = async (): Promise<Payment[]> => {
-  const { data } = await api.get('/payments');
-  return data;
 };
 
-export const createPayment = async (payment: CreatePaymentDto): Promise<Payment> => {
-  const { data } = await api.post('/payments', payment);
-  return data;
+export const getPayments = async (): Promise<Payment[]> => {
+  try {
+    const response = await axiosInstance.get('/payments');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    throw error;
+  }
 };
 
 export const updatePayment = async (id: string, payment: Partial<Payment>): Promise<Payment> => {
-  const { data } = await api.patch(`/payments/${id}`, payment);
+  const { data } = await axiosInstance.patch(`/payments/${id}`, payment);
   return data;
 };
 
 export const deletePayment = async (id: string): Promise<void> => {
-  await api.delete(`/payments/${id}`);
+  await axiosInstance.delete(`/payments/${id}`);
 }; 
