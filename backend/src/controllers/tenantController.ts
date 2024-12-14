@@ -49,8 +49,8 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
     const savedTenant = await tenant.save();
     console.log('Saved tenant:', savedTenant);
 
-    // Créer l'objet locataire pour la propriété avec le type correct
-    const tenantForProperty: ITenant = {
+    // Créer l'objet locataire pour la propriété
+    const tenantForProperty = {
       userId: savedTenant._id as Types.ObjectId,
       firstName: savedTenant.firstName,
       lastName: savedTenant.lastName,
@@ -58,25 +58,33 @@ export const createTenant = async (req: Request, res: Response): Promise<Respons
       leaseEndDate: new Date(leaseEndDate),
       rentAmount: Number(rentAmount),
       depositAmount: Number(depositAmount),
-      status: (status || 'active') as 'active' | 'inactive',
+      status: (status || 'pending') as 'active' | 'inactive' | 'pending',
       rentStatus: (rentStatus || 'pending') as 'pending' | 'paid'
     };
 
-    // Ajouter le tenant à la propriété
-    property.tenants.push(tenantForProperty);
-    property.status = 'occupied';
-    await property.save();
+    try {
+      // Ajouter le tenant à la propriété
+      property.tenants.push(tenantForProperty);
+      property.status = 'occupied';
+      await property.save();
 
-    // Retourner le locataire créé avec les informations de la propriété
-    const populatedTenant = await Tenant.findById(savedTenant._id)
-      .populate('propertyId', 'name address');
+      // Retourner le locataire créé avec les informations de la propriété
+      const populatedTenant = await Tenant.findById(savedTenant._id)
+        .populate('propertyId', 'name address');
 
-    return res.status(201).json(populatedTenant);
+      return res.status(201).json(populatedTenant);
+    } catch (propertyError) {
+      // Si l'ajout à la propriété échoue, supprimer le tenant créé
+      await Tenant.findByIdAndDelete(savedTenant._id);
+      throw propertyError;
+    }
   } catch (error) {
     console.error('Error creating tenant:', error);
+    // Retourner une réponse plus détaillée
     return res.status(500).json({ 
-      message: 'Error creating tenant', 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      message: 'Error creating tenant',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      details: error
     });
   }
 };

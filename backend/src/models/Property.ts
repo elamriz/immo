@@ -8,7 +8,7 @@ export interface ITenant {
   leaseEndDate?: Date;
   rentAmount: number;
   depositAmount: number;
-  status: 'active' | 'inactive';
+  status: 'active' | 'inactive' | 'pending';
   rentStatus: 'pending' | 'paid';
 }
 
@@ -86,8 +86,8 @@ const propertySchema = new Schema<IProperty>({
     },
     status: {
       type: String,
-      enum: ['active', 'inactive'],
-      default: 'active'
+      enum: ['active', 'inactive', 'pending'],
+      default: 'pending'
     },
     rentStatus: {
       type: String,
