@@ -36,3 +36,8 @@ Property Manager App est une application web conçue pour simplifier la gestion 
 - Revenus mensuels/annuels pour les propriétaires.
 - Nombre de tickets ouverts/clôturés.
 - Liste des loyers en retard et propriétés vacantes.
+
+
+
+update proprietes not working
+

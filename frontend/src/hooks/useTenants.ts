@@ -1,80 +1,91 @@
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useMutation, useQuery, useQueryClient } from 'react-query';
+import { axiosInstance } from '../api/axios';
+import { Tenant } from '../types/tenant';
 import { notifications } from '@mantine/notifications';
-import { getTenants, createTenant, updateTenant, deleteTenant } from '../api/tenant';
-import { Tenant, CreateTenantDto } from '../types/tenant';
 
-export function useTenants(propertyId: string | null) {
+export const getTenants = async (propertyId: string): Promise<Tenant[]> => {
+  const { data } = await axiosInstance.get(`/tenants?propertyId=${propertyId}`);
+  return data;
+};
+
+export const createTenant = async (tenant: Omit<Tenant, '_id'>): Promise<Tenant> => {
+  try {
+    const { data } = await axiosInstance.post('/tenants', tenant);
+    return data;
+  } catch (error: any) {
+    console.error('Error in createTenant:', error.response?.data || error);
+    throw error;
+  }
+};
+
+export function useTenants(propertyId: string) {
   const queryClient = useQueryClient();
 
   const { data: tenants = [], isLoading } = useQuery(
     ['tenants', propertyId],
-    () => propertyId ? getTenants(propertyId) : Promise.resolve([]),
+    () => getTenants(propertyId),
     {
-      enabled: !!propertyId
+      enabled: !!propertyId,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchInterval: (data) => {
+        const hasPendingTenants = data?.some(tenant => tenant.status === 'pending');
+        return hasPendingTenants ? 2000 : false;
+      }
     }
   );
 
-  const addTenant = useMutation(
-    (newTenant: CreateTenantDto) => createTenant(newTenant),
-    {
-      onSuccess: (tenant) => {
-        queryClient.setQueryData(['tenants', tenant.propertyId], 
-          (old: Tenant[] = []) => [...old, tenant]
-        );
-        notifications.show({
-          title: 'Succès',
-          message: 'Locataire ajouté avec succès',
-          color: 'green',
-        });
-      },
-      onError: (error: any) => {
-        notifications.show({
-          title: 'Erreur',
-          message: error.response?.data?.message || 'Erreur lors de l\'ajout du locataire',
-          color: 'red',
-        });
-      },
-    }
-  );
+  const addTenant = useMutation(createTenant, {
+    onMutate: async (newTenant) => {
+      await queryClient.cancelQueries(['tenants', propertyId]);
 
-  const updateTenantMutation = useMutation(
-    (data: { id: string; tenant: Partial<Tenant> }) => 
-      updateTenant(data.id, data.tenant),
-    {
-      onSuccess: (updatedTenant) => {
-        queryClient.setQueryData(['tenants', updatedTenant.propertyId],
-          (old: Tenant[] = []) => old.map(t => 
-            t._id === updatedTenant._id ? updatedTenant : t
-          )
-        );
-        notifications.show({
-          title: 'Succès',
-          message: 'Locataire mis à jour avec succès',
-          color: 'green',
-        });
-      },
-    }
-  );
+      const previousTenants = queryClient.getQueryData(['tenants', propertyId]);
 
-  const deleteTenantMutation = useMutation(
-    (id: string) => deleteTenant(id),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['tenants', propertyId]);
-        notifications.show({
-          title: 'Succès',
-          message: 'Locataire supprimé avec succès',
-          color: 'green',
-        });
-      },
+      queryClient.setQueryData(['tenants', propertyId], (old: Tenant[] = []) => [
+        ...old,
+        { ...newTenant, _id: 'temp-id' } as Tenant
+      ]);
+
+      return { previousTenants };
+    },
+    onSuccess: (newTenant) => {
+      queryClient.setQueryData(['tenants', propertyId], (old: Tenant[] = []) => {
+        const filteredTenants = old.filter(t => t._id !== 'temp-id');
+        return [...filteredTenants, newTenant];
+      });
+
+      queryClient.invalidateQueries(['tenants', propertyId]);
+      queryClient.invalidateQueries('properties');
+
+      notifications.show({
+        title: 'Succès',
+        message: 'Le locataire a été créé avec succès',
+        color: 'green'
+      });
+    },
+    onError: (error: any, newTenant, context) => {
+      if (context?.previousTenants) {
+        queryClient.setQueryData(['tenants', propertyId], context.previousTenants);
+      }
+
+      const errorMessage = error.response?.data?.message || error.message || 'Erreur lors de la création du locataire';
+      console.error('Tenant creation error:', error.response?.data || error);
+      
+      notifications.show({
+        title: 'Erreur',
+        message: errorMessage,
+        color: 'red'
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries(['tenants', propertyId]);
     }
-  );
+  });
 
   return {
     tenants,
     isLoading,
     addTenant: addTenant.mutate,
-    updateTenant: updateTenantMutation.mutate,
-    deleteTenant: deleteTenantMutation.mutate,
+    isCreating: addTenant.isLoading
   };
 } 

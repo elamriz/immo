@@ -3,18 +3,20 @@ import { Ticket } from '../models/Ticket';
 import { Property } from '../models/Property';
 import { Tenant } from '../models/Tenant';
 import { Types } from 'mongoose';
+import { Contractor } from '../models/Contractor';
 
 export const createTicket = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { propertyId, title, description, priority, ticketType, tenantId } = req.body;
+    const { propertyId, title, description, priority, ticketType, tenantId, contractorId } = req.body;
     
-    console.log('Creating ticket with data:', {
+    console.log('Received ticket data:', {
       propertyId,
       title,
       description,
       priority,
       ticketType,
-      tenantId
+      tenantId,
+      contractorId
     });
 
     // Vérifier que la propriété appartient à l'utilisateur
@@ -24,15 +26,11 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
     });
 
     if (!property) {
-      console.log('Property not found:', { propertyId, userId: req.user._id });
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    // Vérifier que le locataire existe et est lié à la propriété si c'est un ticket spécifique
+    // Vérifier le locataire si nécessaire
     if (ticketType === 'tenant_specific' && tenantId) {
-      console.log('Checking tenant:', { tenantId, propertyId });
-      
-      // Vérifier d'abord dans la collection Tenant
       const tenant = await Tenant.findOne({
         _id: tenantId,
         propertyId: propertyId,
@@ -40,27 +38,39 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
       });
 
       if (!tenant) {
-        console.log('Tenant not found or not active:', { tenantId, propertyId });
         return res.status(400).json({ 
-          message: 'Le locataire spécifié n\'est pas associé à cette propriété ou n\'est pas actif',
-          details: {
-            tenantId,
-            propertyId,
-            ticketType
-          }
+          message: 'Le locataire spécifié n\'est pas associé à cette propriété ou n\'est pas actif'
         });
       }
     }
 
-    const ticketData = {
+    // Vérifier le réparateur si fourni
+    if (contractorId) {
+      const contractor = await Contractor.findById(contractorId);
+      if (!contractor) {
+        return res.status(404).json({ message: 'Contractor not found' });
+      }
+    }
+
+    // Créer l'objet ticket
+    const ticketData: any = {
       propertyId: new Types.ObjectId(propertyId),
       title,
       description,
       priority,
-      status: 'open',
-      ticketType,
-      ...(tenantId && { tenantId: new Types.ObjectId(tenantId) })
+      status: contractorId ? 'assigned' : 'open',
+      ticketType
     };
+
+    // Ajouter le locataire si spécifié
+    if (tenantId) {
+      ticketData.tenantId = new Types.ObjectId(tenantId);
+    }
+
+    // Ajouter le réparateur si spécifié
+    if (contractorId) {
+      ticketData.assignedContractor = new Types.ObjectId(contractorId);
+    }
 
     console.log('Creating ticket with data:', ticketData);
 
@@ -69,9 +79,10 @@ export const createTicket = async (req: Request, res: Response): Promise<Respons
 
     const populatedTicket = await Ticket.findById(ticket._id)
       .populate('propertyId', 'name')
-      .populate('tenantId', 'firstName lastName email');
+      .populate('tenantId', 'firstName lastName')
+      .populate('assignedContractor', 'name specialty');
 
-    console.log('Created ticket:', populatedTicket);
+    console.log('Created ticket with populated data:', populatedTicket);
     return res.status(201).json(populatedTicket);
   } catch (error) {
     console.error('Error creating ticket:', error);
@@ -91,51 +102,11 @@ export const getTickets = async (req: Request, res: Response): Promise<Response>
       propertyId: { $in: propertyIds }
     })
     .populate('propertyId', 'name')
+    .populate('tenantId', 'firstName lastName')
+    .populate('assignedContractor', 'name specialty')
     .lean();
 
-    // Récupérer tous les tenants une seule fois
-    const tenantIds = tickets
-      .filter(ticket => ticket.ticketType === 'tenant_specific' && ticket.tenantId)
-      .map(ticket => ticket.tenantId);
-
-    const tenants = await Tenant.find({
-      _id: { $in: tenantIds }
-    }).lean();
-
-    // Créer un Map pour un accès rapide aux tenants
-    const tenantsMap = new Map(
-      tenants.map(tenant => [tenant._id.toString(), tenant])
-    );
-
-    // Enrichir les tickets avec les informations du tenant
-    const enrichedTickets = tickets.map((ticket) => {
-      if (ticket.ticketType === 'tenant_specific' && ticket.tenantId) {
-        const tenant = tenantsMap.get(ticket.tenantId.toString());
-        
-        if (tenant) {
-          console.log('Found tenant:', tenant);
-          return {
-            ...ticket,
-            tenantInfo: {
-              firstName: tenant.firstName,
-              lastName: tenant.lastName
-            }
-          };
-        }
-      }
-      return ticket;
-    });
-
-    // Log final enriched tickets
-    console.log('Final enriched tickets:', enrichedTickets.map(ticket => ({
-      _id: ticket._id,
-      tenantId: ticket.tenantId,
-      tenantInfo: ticket.tenantInfo,
-      ticketType: ticket.ticketType,
-      propertyId: ticket.propertyId._id
-    })));
-
-    return res.json(enrichedTickets);
+    return res.json(tickets);
   } catch (error) {
     console.error('Error fetching tickets:', error);
     return res.status(500).json({
@@ -170,7 +141,8 @@ export const updateTicket = async (req: Request, res: Response): Promise<Respons
       { new: true }
     )
     .populate('propertyId', 'name')
-    .populate('tenantId', 'firstName lastName');
+    .populate('tenantId', 'firstName lastName')
+    .populate('assignedContractor', 'name specialty');
 
     return res.json(updatedTicket);
   } catch (error) {
@@ -256,13 +228,36 @@ export const assignContractor = async (req: Request, res: Response): Promise<Res
       return res.status(404).json({ message: 'Ticket not found' });
     }
 
-    ticket.assignedTo = contractorId;
-    ticket.status = 'in_progress';
-    await ticket.save();
+    // Vérifier que la propriété appartient à l'utilisateur
+    const property = await Property.findOne({
+      _id: ticket.propertyId,
+      owner: req.user._id
+    });
 
-    const updatedTicket = await Ticket.findById(id)
-      .populate('assignedTo', 'firstName lastName')
-      .populate('propertyId', 'name');
+    if (!property) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    // Vérifier que le réparateur existe
+    if (contractorId) {
+      const contractor = await Contractor.findById(contractorId);
+      if (!contractor) {
+        return res.status(404).json({ message: 'Contractor not found' });
+      }
+    }
+
+    // Mettre à jour le ticket
+    const updatedTicket = await Ticket.findByIdAndUpdate(
+      id,
+      { 
+        assignedContractor: contractorId,
+        status: contractorId ? 'assigned' : 'open'
+      },
+      { new: true }
+    )
+    .populate('propertyId', 'name')
+    .populate('tenantId', 'firstName lastName')
+    .populate('assignedContractor', 'name specialty');
 
     return res.json(updatedTicket);
   } catch (error) {

@@ -1,5 +1,5 @@
 import { Container, Title, Button, Group, Paper, Stack } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { IconPlus, IconTicket } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { notifications } from '@mantine/notifications';
@@ -7,10 +7,12 @@ import { getProperties, deleteProperty } from '../api/property';
 import { PropertyList } from '../components/property/PropertyList';
 import { AddPropertyModal } from '../components/property/AddPropertyModal';
 import { Property } from '../types/property';
+import { useNavigate } from 'react-router-dom';
 
 export function Properties() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: properties = [], isLoading } = useQuery('properties', getProperties);
 
@@ -32,6 +34,20 @@ export function Properties() {
     },
   });
 
+  const renderPropertyActions = (property: Property) => (
+    <Group>
+      <Button
+        variant="light"
+        size="sm"
+        leftIcon={<IconTicket size={16} />}
+        onClick={() => navigate(`/properties/${property._id}/tickets/new`)}
+      >
+        Nouveau ticket
+      </Button>
+      {/* ... autres actions ... */}
+    </Group>
+  );
+
   if (isLoading) {
     return (
       <Container size="xl">
@@ -49,6 +65,15 @@ export function Properties() {
           onClick={() => setIsAddModalOpen(true)}
         >
           Ajouter une propriété
+        </Button>
+      </Group>
+
+      <Group position="right" mb="md">
+        <Button 
+          leftIcon={<IconPlus size={16} />}
+          onClick={() => navigate(`/properties/${property._id}/tickets/new`)}
+        >
+          Nouveau ticket
         </Button>
       </Group>
 
@@ -75,6 +100,7 @@ export function Properties() {
           onDelete={(id) => {
             deleteMutation.mutate(id);
           }}
+          renderActions={renderPropertyActions}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { Grid, Card, Text, Badge, Group, Button, ActionIcon } from '@mantine/core';
+import { Grid, Card, Text, Badge, Group, Button, ActionIcon, Stack, Paper } from '@mantine/core';
 import { IconPencil, IconTrash } from '@tabler/icons-react';
 import { Property } from '../../types/property';
 import { useState } from 'react';
@@ -8,11 +8,12 @@ import { deleteProperty } from '../../api/property';
 
 interface PropertyListProps {
   properties: Property[];
-  onUpdate: (updatedProperty: Property) => void;
+  onUpdate: (property: Property) => void;
   onDelete: (id: string) => void;
+  renderActions?: (property: Property) => React.ReactNode;
 }
 
-export function PropertyList({ properties, onUpdate, onDelete }: PropertyListProps) {
+export function PropertyList({ properties, onUpdate, onDelete, renderActions }: PropertyListProps) {
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
 
   return (
@@ -51,7 +52,8 @@ export function PropertyList({ properties, onUpdate, onDelete }: PropertyListPro
                 </Group>
               )}
 
-              <Group position="apart" mt="md">
+              <Group position="right">
+                {renderActions?.(property)}
                 <ActionIcon 
                   color="blue" 
                   onClick={() => {

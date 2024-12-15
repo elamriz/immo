@@ -6,9 +6,9 @@ export interface ITicket extends Document {
   tenantId?: mongoose.Types.ObjectId;
   title: string;
   description: string;
-  status: 'open' | 'in_progress' | 'resolved';
+  status: 'open' | 'assigned' | 'in_progress' | 'resolved';
   priority: 'low' | 'medium' | 'high';
-  assignedTo?: mongoose.Types.ObjectId;
+  assignedContractor?: mongoose.Types.ObjectId;
   attachments: string[];
   comments: {
     author: mongoose.Types.ObjectId;
@@ -20,10 +20,6 @@ export interface ITicket extends Document {
     performedBy: mongoose.Types.ObjectId;
     timestamp: Date;
   }[];
-  tenantInfo?: {
-    firstName: string;
-    lastName: string;
-  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,7 +53,7 @@ const ticketSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['open', 'in_progress', 'resolved'],
+    enum: ['open', 'assigned', 'in_progress', 'resolved'],
     default: 'open'
   },
   priority: {
@@ -65,9 +61,10 @@ const ticketSchema = new Schema({
     enum: ['low', 'medium', 'high'],
     default: 'medium'
   },
-  assignedTo: {
+  assignedContractor: {
     type: Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'Contractor',
+    required: false
   },
   attachments: [{
     type: String
@@ -106,19 +103,13 @@ const ticketSchema = new Schema({
   timestamps: true
 });
 
-// Middleware pour peupler automatiquement l'historique lors des modifications
-ticketSchema.pre('save', function(next) {
-  if (this.isModified()) {
-    const changedPaths = this.modifiedPaths();
-    changedPaths.forEach(path => {
-      if (path !== 'history' && path !== 'updatedAt') {
-        this.history.push({
-          action: `${path} updated to ${this.get(path)}`,
-          performedBy: this.get('updatedBy'), // Vous devrez gérer updatedBy dans vos routes
-          timestamp: new Date()
-        });
-      }
-    });
+// Middleware pour mettre à jour le nombre de jobs complétés du réparateur
+ticketSchema.pre('save', async function(next) {
+  if (this.isModified('status') && this.status === 'resolved' && this.assignedContractor) {
+    await mongoose.model('Contractor').findByIdAndUpdate(
+      this.assignedContractor,
+      { $inc: { completedJobs: 1 } }
+    );
   }
   next();
 });

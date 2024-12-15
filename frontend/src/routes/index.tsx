@@ -10,6 +10,7 @@ import { Settings } from '../pages/Settings';
 import { Login } from '../pages/Login';
 import { Register } from '../pages/Register';
 import { PrivateRoute } from './PrivateRoute';
+import { CreateTicketPage } from '../pages/tickets/CreateTicketPage';
 
 export default function AppRoutes() {
   return (
@@ -24,6 +25,7 @@ export default function AppRoutes() {
         <Route path="tenants" element={<Tenants />} />
         <Route path="payments" element={<Payments />} />
         <Route path="tickets" element={<Tickets />} />
+        <Route path="properties/:propertyId/tickets/new" element={<CreateTicketPage />} />
         <Route path="contractors" element={<Contractors />} />
         <Route path="settings" element={<Settings />} />
       </Route>

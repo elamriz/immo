@@ -1,5 +1,14 @@
-import { Container, Title, Button, Group, Paper, Stack, Text, Select, Modal, TextInput, Textarea } from '@mantine/core';
-import { IconPlus, IconSortDescending, IconHome, IconAlertTriangle } from '@tabler/icons-react';
+import { 
+  Container, Title, Button, Group, Paper, Stack, Text, Select, 
+  Badge, Grid, Card, Avatar, Timeline, ActionIcon, Menu, Divider 
+} from '@mantine/core';
+import { 
+  IconPlus, IconSortDescending, IconAlertTriangle, IconClock, 
+  IconUser, IconBuilding, IconDotsVertical, IconCheck, IconX,
+  IconEdit, IconTrash, IconPrinter, IconShare 
+} from '@tabler/icons-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { useState, useEffect, useMemo } from 'react';
 import { useTickets } from '../hooks/useTickets';
 import { useForm } from '@mantine/form';
@@ -7,6 +16,7 @@ import { useQuery } from 'react-query';
 import { getProperties, getTenants } from '../api/properties';
 import { Property } from '../types/property';
 import { Tenant } from '../types/tenant';
+import { useNavigate } from 'react-router-dom';
 
 interface Ticket {
   _id: string;
@@ -29,6 +39,146 @@ interface Ticket {
     firstName: string;
     lastName: string;
   };
+  assignedContractor?: {
+    _id: string;
+    name: string;
+    specialty: string;
+  };
+}
+
+function TicketCard({ ticket, onStatusChange, onDelete }: { 
+  ticket: Ticket; 
+  onStatusChange: (id: string, status: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'red';
+      case 'medium': return 'yellow';
+      case 'low': return 'blue';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'open': return 'blue';
+      case 'in_progress': return 'yellow';
+      case 'resolved': return 'green';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'open': return <IconClock size={16} />;
+      case 'in_progress': return <IconUser size={16} />;
+      case 'resolved': return <IconCheck size={16} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <Card shadow="sm" padding="lg" radius="md" withBorder>
+      <Card.Section p="md" bg="gray.0">
+        <Group position="apart">
+          <Group>
+            <Badge 
+              color={getPriorityColor(ticket.priority)}
+              variant="filled"
+              size="lg"
+            >
+              {ticket.priority.toUpperCase()}
+            </Badge>
+            <Text fw={500} size="lg">{ticket.title}</Text>
+          </Group>
+          <Menu position="bottom-end">
+            <Menu.Target>
+              <ActionIcon>
+                <IconDotsVertical size={16} />
+              </ActionIcon>
+            </Menu.Target>
+            <Menu.Dropdown>
+              <Menu.Item icon={<IconEdit size={14} />}>Modifier</Menu.Item>
+              <Menu.Item icon={<IconPrinter size={14} />}>Imprimer</Menu.Item>
+              <Menu.Item icon={<IconShare size={14} />}>Partager</Menu.Item>
+              <Menu.Divider />
+              <Menu.Item 
+                color="red" 
+                icon={<IconTrash size={14} />}
+                onClick={() => onDelete(ticket._id)}
+              >
+                Supprimer
+              </Menu.Item>
+            </Menu.Dropdown>
+          </Menu>
+        </Group>
+      </Card.Section>
+
+      <Stack spacing="md" mt="md">
+        <Group position="apart">
+          <Group spacing="xs">
+            <IconBuilding size={16} />
+            <Text size="sm">{ticket.propertyId.name}</Text>
+          </Group>
+          <Badge 
+            color={getStatusColor(ticket.status)}
+            variant="light"
+            leftSection={getStatusIcon(ticket.status)}
+          >
+            {ticket.status}
+          </Badge>
+        </Group>
+
+        <Text size="sm" color="dimmed">
+          {ticket.description}
+        </Text>
+
+        {ticket.ticketType === 'tenant_specific' && ticket.tenantInfo && (
+          <Group spacing="xs">
+            <Avatar 
+              size="sm" 
+              radius="xl"
+              color="blue"
+            >
+              {`${ticket.tenantInfo.firstName[0]}${ticket.tenantInfo.lastName[0]}`}
+            </Avatar>
+            <Text size="sm">
+              {ticket.tenantInfo.firstName} {ticket.tenantInfo.lastName}
+            </Text>
+          </Group>
+        )}
+
+        {ticket.assignedContractor && (
+          <Group spacing="xs" mt="md">
+            <IconUser size={16} />
+            <Text size="sm">
+              Réparateur assigné: {ticket.assignedContractor.name} 
+              ({ticket.assignedContractor.specialty})
+            </Text>
+          </Group>
+        )}
+
+        <Divider />
+
+        <Group position="apart">
+          <Text size="xs" color="dimmed">
+            Créé le {format(new Date(ticket.createdAt), 'dd MMMM yyyy', { locale: fr })}
+          </Text>
+          <Select
+            size="xs"
+            value={ticket.status}
+            onChange={(value) => onStatusChange(ticket._id, value as string)}
+            data={[
+              { value: 'open', label: 'Ouvert' },
+              { value: 'in_progress', label: 'En cours' },
+              { value: 'resolved', label: 'Résolu' },
+            ]}
+          />
+        </Group>
+      </Stack>
+    </Card>
+  );
 }
 
 export function Tickets() {
@@ -36,6 +186,8 @@ export function Tickets() {
   const [sortBy, setSortBy] = useState<'date' | 'priority'>('date');
   const [filterProperty, setFilterProperty] = useState<string | null>(null);
   const { tickets, isLoading, addTicket, updateTicket, deleteTicket } = useTickets();
+  const navigate = useNavigate();
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   const form = useForm({
     initialValues: {
@@ -120,169 +272,87 @@ export function Tickets() {
   };
 
   return (
-    <Container size="lg">
+    <Container size="xl">
       <Group position="apart" mb="xl">
         <Title>Tickets</Title>
-        <Button
-          leftIcon={<IconPlus size={16} />}
-          onClick={() => setIsModalOpen(true)}
-        >
-          Nouveau ticket
-        </Button>
-      </Group>
-
-      <Group mb="md">
-        <Select
-          placeholder="Filtrer par propriété"
-          data={[
-            { value: '', label: 'Toutes les propriétés' },
-            ...properties.map(p => ({ value: p._id, label: p.name }))
-          ]}
-          value={filterProperty}
-          onChange={setFilterProperty}
-          clearable
-          style={{ width: 200 }}
-        />
-        <Select
-          placeholder="Trier par"
-          data={[
-            { value: 'date', label: 'Date', icon: IconSortDescending },
-            { value: 'priority', label: 'Priorité', icon: IconAlertTriangle }
-          ]}
-          value={sortBy}
-          onChange={(value: 'date' | 'priority') => setSortBy(value)}
-          style={{ width: 150 }}
-        />
-      </Group>
-
-      <Stack spacing="md">
-        {sortedAndFilteredTickets.map((ticket) => (
-          <Paper key={ticket._id} p="md" withBorder>
-            <Group position="apart">
-              <div>
-                <Group spacing="xs">
-                  <Text weight={500}>{ticket.title}</Text>
-                  {ticket.priority === 'high' && (
-                    <IconAlertTriangle size={16} color="red" />
-                  )}
-                </Group>
-                <Text size="sm" color="dimmed">
-                  {ticket.description}
-                </Text>
-                <Text size="xs" color="dimmed">
-                  {ticket.propertyId.name}
-                  {ticket.ticketType === 'tenant_specific' && ticket.tenantInfo && (
-                    ` - ${ticket.tenantInfo.firstName} ${ticket.tenantInfo.lastName}`
-                  )}
-                </Text>
-              </div>
-              <Group>
-                <Select
-                  value={ticket.status}
-                  onChange={(value) => handleStatusChange(ticket._id, value as any)}
-                  data={[
-                    { value: 'open', label: 'Ouvert' },
-                    { value: 'in_progress', label: 'En cours' },
-                    { value: 'resolved', label: 'Résolu' },
-                  ]}
-                />
-                <Button
-                  color="red"
-                  variant="subtle"
-                  onClick={() => deleteTicket(ticket._id)}
-                >
-                  Supprimer
-                </Button>
-              </Group>
-            </Group>
-          </Paper>
-        ))}
-      </Stack>
-
-      <Modal
-        opened={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          form.reset();
-        }}
-        title="Nouveau ticket"
-      >
-        <form onSubmit={form.onSubmit(handleSubmit)}>
+        <Group>
           <Select
-            label="Propriété"
-            placeholder="Sélectionnez une propriété"
+            placeholder="Sélectionner une propriété"
             data={properties.map(p => ({ value: p._id, label: p.name }))}
-            {...form.getInputProps('propertyId')}
-            onChange={(value) => {
-              form.setFieldValue('propertyId', value);
-              form.setFieldValue('tenantId', '');
-              console.log('Property changed to:', value);
-            }}
-            mb="md"
+            value={selectedPropertyId}
+            onChange={setSelectedPropertyId}
+            style={{ width: 200 }}
+            required
           />
+          <Button
+            leftIcon={<IconPlus size={16} />}
+            onClick={() => {
+              if (selectedPropertyId) {
+                navigate(`/properties/${selectedPropertyId}/tickets/new`);
+              } else {
+                notifications.show({
+                  title: 'Erreur',
+                  message: 'Veuillez sélectionner une propriété',
+                  color: 'red',
+                });
+              }
+            }}
+            disabled={!selectedPropertyId}
+          >
+            Nouveau ticket
+          </Button>
+        </Group>
+      </Group>
 
+      <Paper p="md" mb="md" withBorder>
+        <Group>
           <Select
-            label="Type de ticket"
-            placeholder="Sélectionnez le type de ticket"
+            placeholder="Filtrer par propriété"
             data={[
-              { value: 'general', label: 'Général (tout l\'immeuble)' },
-              { value: 'tenant_specific', label: 'Spécifique à un locataire' }
+              { value: '', label: 'Toutes les propriétés' },
+              ...properties.map(p => ({ value: p._id, label: p.name }))
             ]}
-            {...form.getInputProps('ticketType')}
-            onChange={(value) => {
-              form.setFieldValue('ticketType', value);
-              form.setFieldValue('tenantId', '');
-              console.log('Ticket type changed to:', value);
-            }}
-            mb="md"
+            value={filterProperty}
+            onChange={setFilterProperty}
+            clearable
+            style={{ width: 200 }}
           />
+          <Select
+            placeholder="Trier par"
+            data={[
+              { value: 'date', label: 'Date', icon: IconSortDescending },
+              { value: 'priority', label: 'Priorité', icon: IconAlertTriangle }
+            ]}
+            value={sortBy}
+            onChange={(value: 'date' | 'priority') => setSortBy(value)}
+            style={{ width: 150 }}
+          />
+        </Group>
+      </Paper>
 
-          {form.values.ticketType === 'tenant_specific' && form.values.propertyId && (
-            <Select
-              label="Locataire"
-              placeholder="Sélectionnez le locataire"
-              data={tenantOptions}
-              {...form.getInputProps('tenantId')}
-              mb="md"
+      <Grid>
+        {sortedAndFilteredTickets.map((ticket) => (
+          <Grid.Col key={ticket._id} span={{ base: 12, md: 6, lg: 4 }}>
+            <TicketCard
+              ticket={ticket}
+              onStatusChange={handleStatusChange}
+              onDelete={deleteTicket}
             />
-          )}
+          </Grid.Col>
+        ))}
+      </Grid>
 
-          <TextInput
-            label="Titre"
-            placeholder="Titre du ticket"
-            {...form.getInputProps('title')}
-            mb="md"
-          />
-
-          <Textarea
-            label="Description"
-            placeholder="Description du problème"
-            {...form.getInputProps('description')}
-            mb="md"
-          />
-
-          <Select
-            label="Priorité"
-            data={[
-              { value: 'low', label: 'Basse' },
-              { value: 'medium', label: 'Moyenne' },
-              { value: 'high', label: 'Haute' },
-            ]}
-            {...form.getInputProps('priority')}
-            mb="xl"
-          />
-
-          <Group position="right">
-            <Button variant="subtle" onClick={() => {
-              setIsModalOpen(false);
-              form.reset();
-            }}>
-              Annuler
-            </Button>
-            <Button type="submit">Créer</Button>
-          </Group>
-        </form>
-      </Modal>
+      {sortedAndFilteredTickets.length === 0 && (
+        <Paper p="xl" withBorder>
+          <Stack align="center" spacing="md">
+            <IconAlertTriangle size={48} color="gray" />
+            <Text size="lg" weight={500}>Aucun ticket trouvé</Text>
+            <Text color="dimmed" align="center">
+              Il n'y a aucun ticket correspondant à vos critères de recherche.
+            </Text>
+          </Stack>
+        </Paper>
+      )}
     </Container>
   );
 } 
