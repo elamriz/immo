@@ -203,10 +203,10 @@ export const addComment = async (req: Request, res: Response): Promise<Response>
     await ticket.save();
 
     const updatedTicket = await Ticket.findById(id)
-      .populate('comments.author', 'firstName lastName')
       .populate('propertyId', 'name')
       .populate('tenantId', 'firstName lastName')
-      .populate('assignedTo', 'firstName lastName');
+      .populate('assignedContractor', 'name specialty')
+      .populate('comments.author', 'firstName lastName');
 
     return res.json(updatedTicket);
   } catch (error) {
@@ -294,6 +294,104 @@ export const addAttachment = async (req: Request, res: Response): Promise<Respon
     console.error('Error adding attachment:', error);
     return res.status(500).json({
       message: 'Error adding attachment',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const startWork = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const ticket = await Ticket.findById(id);
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    // Vérifier que le ticket est bien assigné
+    if (ticket.status !== 'assigned') {
+      return res.status(400).json({ 
+        message: 'Le ticket doit être assigné avant de pouvoir commencer les travaux' 
+      });
+    }
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(
+      id,
+      { 
+        status: 'in_progress',
+        workStartedAt: new Date()
+      },
+      { new: true }
+    )
+    .populate('propertyId', 'name')
+    .populate('tenantId', 'firstName lastName')
+    .populate('assignedContractor', 'name specialty');
+
+    // Ajouter un commentaire automatique
+    if (updatedTicket) {
+      updatedTicket.comments.push({
+        author: req.user._id,
+        content: 'Les travaux ont commencé',
+        createdAt: new Date()
+      });
+      await updatedTicket.save();
+    }
+
+    return res.json(updatedTicket);
+  } catch (error) {
+    console.error('Error starting work:', error);
+    return res.status(500).json({
+      message: 'Error starting work',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+};
+
+export const resolveTicket = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const { resolution } = req.body;
+    const ticket = await Ticket.findById(id);
+
+    if (!ticket) {
+      return res.status(404).json({ message: 'Ticket not found' });
+    }
+
+    // Vérifier que le ticket est en cours
+    if (ticket.status !== 'in_progress') {
+      return res.status(400).json({ 
+        message: 'Le ticket doit être en cours avant de pouvoir être résolu' 
+      });
+    }
+
+    const updatedTicket = await Ticket.findByIdAndUpdate(
+      id,
+      { 
+        status: 'resolved',
+        resolvedAt: new Date(),
+        resolution
+      },
+      { new: true }
+    )
+    .populate('propertyId', 'name')
+    .populate('tenantId', 'firstName lastName')
+    .populate('assignedContractor', 'name specialty');
+
+    // Ajouter un commentaire de résolution
+    if (updatedTicket) {
+      updatedTicket.comments.push({
+        author: req.user._id,
+        content: `Ticket résolu : ${resolution}`,
+        createdAt: new Date()
+      });
+      await updatedTicket.save();
+    }
+
+    return res.json(updatedTicket);
+  } catch (error) {
+    console.error('Error resolving ticket:', error);
+    return res.status(500).json({
+      message: 'Error resolving ticket',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

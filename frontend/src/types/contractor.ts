@@ -5,6 +5,14 @@ export interface Contractor {
   email?: string;
   specialty: string;
   location?: string;
+  status: 'active' | 'inactive';
+  ratings: {
+    score: number;
+    comment: string;
+    createdBy: string;
+    createdAt: Date;
+  }[];
+  completedJobs: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -15,4 +23,9 @@ export interface CreateContractorDto {
   email?: string;
   specialty: string;
   location?: string;
+}
+
+export interface Rating {
+  score: number;
+  comment: string;
 } 

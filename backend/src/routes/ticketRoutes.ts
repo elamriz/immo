@@ -6,8 +6,10 @@ import {
   getTickets,
   updateTicket,
   deleteTicket,
-  addComment,
   assignContractor,
+  startWork,
+  resolveTicket,
+  addComment,
   addAttachment
 } from '../controllers/ticketController';
 
@@ -45,10 +47,12 @@ router.use(auth);
 // Routes
 router.post('/', createTicket);
 router.get('/', getTickets);
-router.put('/:id', updateTicket);
+router.patch('/:id', updateTicket);
 router.delete('/:id', deleteTicket);
-router.post('/:id/comments', addComment);
 router.post('/:id/assign', assignContractor);
+router.post('/:id/start', startWork);
+router.post('/:id/resolve', resolveTicket);
+router.post('/:id/comments', addComment);
 
 // Route pour les fichiers avec middleware multer
 router.post(

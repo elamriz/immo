@@ -1,60 +1,104 @@
-import React from 'react';
-import { Container, Title, Button, Group, Paper, Stack, Text } from '@mantine/core';
-import { IconPlus } from '@tabler/icons-react';
+import { Container, Title, Button, Group, Paper, Stack, TextInput, Select } from '@mantine/core';
+import { IconPlus, IconSearch, IconFilter } from '@tabler/icons-react';
 import { useState } from 'react';
-
-// TODO: Créer ces types et API endpoints
-interface Contractor {
-  _id: string;
-  name: string;
-  specialty: string;
-  phone: string;
-  email: string;
-  address: string;
-  rating: number;
-}
+import { useQuery } from 'react-query';
+import { getContractors } from '../api/contractor';
+import { ContractorList } from '../components/contractor/ContractorList';
+import { AddContractorModal } from '../components/contractor/AddContractorModal';
 
 export function Contractors() {
-  // TODO: Implémenter la logique de gestion des réparateurs
-  const contractors: Contractor[] = [];
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [specialtyFilter, setSpecialtyFilter] = useState<string | null>(null);
+  const [locationFilter, setLocationFilter] = useState<string | null>(null);
+
+  const { data: contractors = [], isLoading } = useQuery('contractors', getContractors);
+
+  // Filtrer les réparateurs
+  const filteredContractors = contractors.filter(contractor => {
+    const matchesSearch = searchTerm === '' || 
+      contractor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      contractor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesSpecialty = !specialtyFilter || contractor.specialty === specialtyFilter;
+    const matchesLocation = !locationFilter || contractor.location === locationFilter;
+
+    return matchesSearch && matchesSpecialty && matchesLocation;
+  });
+
+  // Extraire les options uniques pour les filtres
+  const specialties = [...new Set(contractors.map(c => c.specialty))];
+  const locations = [...new Set(contractors.filter(c => c.location).map(c => c.location))];
 
   return (
     <Container size="xl">
-      <Group justify="space-between" mb="xl">
+      <Group position="apart" mb="xl">
         <Title>Réparateurs</Title>
         <Button
-          leftSection={<IconPlus size={20} />}
-          onClick={() => {
-            // TODO: Implémenter l'ajout de réparateur
-          }}
+          leftIcon={<IconPlus size={20} />}
+          onClick={() => setIsAddModalOpen(true)}
         >
           Ajouter un réparateur
         </Button>
       </Group>
 
-      {contractors.length === 0 ? (
+      <Paper p="md" mb="lg" withBorder>
+        <Group grow>
+          <TextInput
+            placeholder="Rechercher un réparateur..."
+            icon={<IconSearch size={16} />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.currentTarget.value)}
+          />
+          <Group>
+            <Select
+              placeholder="Spécialité"
+              icon={<IconFilter size={16} />}
+              clearable
+              data={specialties.map(s => ({ value: s, label: s }))}
+              value={specialtyFilter}
+              onChange={setSpecialtyFilter}
+              style={{ width: 200 }}
+            />
+            <Select
+              placeholder="Localisation"
+              icon={<IconFilter size={16} />}
+              clearable
+              data={locations.map(l => ({ value: l, label: l }))}
+              value={locationFilter}
+              onChange={setLocationFilter}
+              style={{ width: 200 }}
+            />
+          </Group>
+        </Group>
+      </Paper>
+
+      {isLoading ? (
         <Paper p="xl" withBorder>
-          <Stack align="center" gap="xl">
-            <Title order={2}>Aucun réparateur</Title>
-            <Text c="dimmed">
-              Aucun réparateur n'a été ajouté pour le moment.
-            </Text>
+          <Stack align="center">
+            <Title order={2}>Chargement...</Title>
+          </Stack>
+        </Paper>
+      ) : filteredContractors.length === 0 ? (
+        <Paper p="xl" withBorder>
+          <Stack align="center">
+            <Title order={2}>Aucun réparateur trouvé</Title>
             <Button
-              leftSection={<IconPlus size={20} />}
-              onClick={() => {
-                // TODO: Implémenter l'ajout de réparateur
-              }}
+              onClick={() => setIsAddModalOpen(true)}
+              leftIcon={<IconPlus size={20} />}
             >
               Ajouter un réparateur
             </Button>
           </Stack>
         </Paper>
       ) : (
-        // TODO: Implémenter l'affichage des réparateurs
-        <Paper p="xl" withBorder>
-          <Text>Liste des réparateurs à implémenter</Text>
-        </Paper>
+        <ContractorList contractors={filteredContractors} />
       )}
+
+      <AddContractorModal
+        opened={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+      />
     </Container>
   );
 } 
