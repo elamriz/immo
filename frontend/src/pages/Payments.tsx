@@ -1,45 +1,35 @@
-import { Container, Title, Button, Group, Paper, Stack, Select } from '@mantine/core';
+import { 
+  Container, Title, Button, Group, Paper, Stack, Select, 
+  Text, Tabs, Badge, Loader 
+} from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
-import { useProperties } from '../hooks/useProperties';
-import { useTenants } from '../hooks/useTenants';
-import { usePayments } from '../hooks/usePayments';
+import { useQuery } from 'react-query';
+import { getProperties } from '../api/property';
 import { PaymentList } from '../components/payment/PaymentList';
 import { AddPaymentModal } from '../components/payment/AddPaymentModal';
 
 export function Payments() {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  const { properties } = useProperties();
-  const { tenants } = useTenants(selectedPropertyId);
-  const { payments, isLoading, addPayment, deletePayment } = usePayments();
-
-  const handleAddPayment = async (paymentData: any) => {
-    try {
-      await addPayment(paymentData);
-      setIsAddModalOpen(false);
-    } catch (error) {
-      console.error('Error adding payment:', error);
-    }
-  };
+  const { data: properties = [], isLoading } = useQuery('properties', getProperties);
+  const selectedProperty = properties.find(p => p._id === selectedPropertyId);
 
   if (isLoading) {
     return (
       <Container size="xl">
-        <Title>Chargement...</Title>
+        <Stack align="center" spacing="xl" mt="xl">
+          <Loader size="xl" />
+          <Text>Chargement des données...</Text>
+        </Stack>
       </Container>
     );
   }
 
-  const filteredPayments = selectedPropertyId
-    ? payments.filter(p => p.propertyId._id === selectedPropertyId)
-    : payments;
-
   return (
     <Container size="xl">
-      <Group justify="space-between" mb="xl">
+      <Group position="apart" mb="xl">
         <Title>Paiements</Title>
         <Group>
           <Select
@@ -47,43 +37,40 @@ export function Payments() {
             data={properties.map(p => ({ value: p._id, label: p.name }))}
             value={selectedPropertyId}
             onChange={setSelectedPropertyId}
-            clearable
-          />
-          <Select
-            placeholder="Sélectionner un locataire"
-            data={tenants.map(t => ({ 
-              value: t._id, 
-              label: `${t.firstName} ${t.lastName}` 
-            }))}
-            value={selectedTenantId}
-            onChange={setSelectedTenantId}
-            disabled={!selectedPropertyId}
+            style={{ width: 200 }}
             clearable
           />
           <Button
-            leftSection={<IconPlus size={20} />}
+            leftIcon={<IconPlus size={16} />}
             onClick={() => setIsAddModalOpen(true)}
-            disabled={!selectedPropertyId || !selectedTenantId}
+            disabled={!selectedPropertyId}
           >
-            Ajouter un paiement
+            Nouveau paiement
           </Button>
         </Group>
       </Group>
 
-      <PaymentList
-        payments={filteredPayments}
-        onView={() => {}}
-        onEdit={() => {}}
-        onDelete={deletePayment}
-      />
+      {selectedProperty && (
+        <Paper withBorder p="md" mb="xl">
+          <Group position="apart">
+            <Stack spacing={4}>
+              <Text size="lg" weight={500}>{selectedProperty.name}</Text>
+              <Text size="sm" color="dimmed">{selectedProperty.address}</Text>
+            </Stack>
+            {selectedProperty.isCoLiving && (
+              <Badge color="blue" size="lg">Colocation</Badge>
+            )}
+          </Group>
+        </Paper>
+      )}
 
-      {selectedPropertyId && selectedTenantId && (
+      <PaymentList propertyId={selectedPropertyId} />
+
+      {selectedPropertyId && (
         <AddPaymentModal
           opened={isAddModalOpen}
           onClose={() => setIsAddModalOpen(false)}
           propertyId={selectedPropertyId}
-          tenantId={selectedTenantId}
-          onAdd={handleAddPayment}
         />
       )}
     </Container>

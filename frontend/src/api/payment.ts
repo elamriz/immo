@@ -37,4 +37,40 @@ export const updatePayment = async (id: string, payment: Partial<Payment>): Prom
 
 export const deletePayment = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/payments/${id}`);
-}; 
+};
+
+export interface PaymentStats {
+  totalDue: number;
+  totalPaid: number;
+  totalLate: number;
+  paymentRate: number;
+}
+
+export const getPaymentStats = async (propertyId?: string | null): Promise<PaymentStats> => {
+  const response = await axiosInstance.get(
+    propertyId ? `/payments/stats/${propertyId}` : '/payments/stats'
+  );
+  return response.data;
+};
+
+export const markPaymentAsPaid = async (id: string): Promise<Payment> => {
+  const response = await axiosInstance.post(`/payments/${id}/mark-paid`);
+  return response.data;
+};
+
+export const sendPaymentReminder = async (id: string): Promise<void> => {
+  await axiosInstance.post(`/payments/${id}/send-reminder`);
+};
+
+export const generateReceipt = async (id: string): Promise<Blob> => {
+  const response = await axiosInstance.get(`/payments/${id}/receipt`, {
+    responseType: 'blob'
+  });
+  return response.data;
+};
+
+export const getPropertyPayments = async (propertyId: string): Promise<Payment[]> => {
+  const response = await axiosInstance.get(`/payments/property/${propertyId}`);
+  return response.data;
+};
+  

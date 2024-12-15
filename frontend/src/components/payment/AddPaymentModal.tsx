@@ -1,36 +1,77 @@
-import { Modal, TextInput, NumberInput, Select, Button, Group } from '@mantine/core';
+import { Modal, TextInput, NumberInput, Select, Button, Group, Text } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { CreatePaymentDto } from '../../types/payment';
+import { useQuery, useQueryClient } from 'react-query';
+import { getProperty } from '../../api/property';
+import { getTenants } from '../../api/tenant';
+import { useEffect } from 'react';
+import { useMutation } from 'react-query';
+import { createPayment } from '../../api/payment';
+import { notifications } from '@mantine/notifications';
 
 interface AddPaymentModalProps {
   opened: boolean;
   onClose: () => void;
-  onAdd: (payment: CreatePaymentDto) => void;
-  tenantId: string;
   propertyId: string;
 }
 
-export function AddPaymentModal({ opened, onClose, onAdd, tenantId, propertyId }: AddPaymentModalProps) {
+export function AddPaymentModal({ opened, onClose, propertyId }: AddPaymentModalProps) {
+  const queryClient = useQueryClient();
+  const { data: property } = useQuery(['property', propertyId], () => getProperty(propertyId));
+  const { data: tenants = [] } = useQuery(
+    ['tenants', propertyId],
+    () => getTenants(propertyId),
+    { enabled: !!propertyId }
+  );
+
+  const createPaymentMutation = useMutation(createPayment, {
+    onSuccess: () => {
+      queryClient.invalidateQueries(['payments', propertyId]);
+      notifications.show({
+        title: 'Succès',
+        message: 'Paiement créé avec succès',
+        color: 'green'
+      });
+      onClose();
+    }
+  });
+
   const form = useForm<CreatePaymentDto>({
     initialValues: {
-      tenantId,
+      tenantId: '',
       propertyId,
       amount: 0,
       dueDate: new Date(),
       status: 'pending',
       paymentMethod: 'bank_transfer',
+      isCoLivingShare: false,
+      shareDetails: {
+        percentage: 0,
+        totalRent: 0,
+        commonCharges: {}
+      }
     },
     validate: {
+      tenantId: (value) => (!value ? 'Sélectionnez un locataire' : null),
       amount: (value) => (value <= 0 ? 'Le montant doit être supérieur à 0' : null),
-      dueDate: (value) => (!value ? 'La date d\'échéance est requise' : null),
     },
   });
 
+  useEffect(() => {
+    if (property?.isCoLiving) {
+      form.setFieldValue('isCoLivingShare', true);
+      form.setFieldValue('shareDetails.totalRent', property.coLivingDetails?.totalRent || 0);
+      
+      // Pré-remplir les charges communes
+      if (property.coLivingDetails?.commonCharges) {
+        form.setFieldValue('shareDetails.commonCharges', property.coLivingDetails.commonCharges);
+      }
+    }
+  }, [property]);
+
   const handleSubmit = form.onSubmit((values) => {
-    onAdd(values);
-    form.reset();
-    onClose();
+    createPaymentMutation.mutate(values);
   });
 
   return (
@@ -41,6 +82,16 @@ export function AddPaymentModal({ opened, onClose, onAdd, tenantId, propertyId }
       size="md"
     >
       <form onSubmit={handleSubmit}>
+        <Select
+          required
+          label="Locataire"
+          data={tenants.map(t => ({
+            value: t._id,
+            label: `${t.firstName} ${t.lastName}`
+          }))}
+          {...form.getInputProps('tenantId')}
+        />
+
         <NumberInput
           required
           label="Montant"
@@ -75,6 +126,29 @@ export function AddPaymentModal({ opened, onClose, onAdd, tenantId, propertyId }
           mt="md"
           {...form.getInputProps('reference')}
         />
+
+        {property?.isCoLiving && (
+          <>
+            <NumberInput
+              required
+              label="Part du loyer (%)"
+              min={0}
+              max={100}
+              {...form.getInputProps('shareDetails.percentage')}
+            />
+            
+            <Text size="sm" weight={500} mt="md">Charges communes</Text>
+            <Group grow>
+              {Object.entries(form.values.shareDetails.commonCharges).map(([key, value]) => (
+                <NumberInput
+                  key={key}
+                  label={key.charAt(0).toUpperCase() + key.slice(1)}
+                  {...form.getInputProps(`shareDetails.commonCharges.${key}`)}
+                />
+              ))}
+            </Group>
+          </>
+        )}
 
         <Group justify="flex-end" mt="xl">
           <Button variant="light" onClick={onClose}>Annuler</Button>

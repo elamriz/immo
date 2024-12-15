@@ -3,14 +3,14 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { CreatePropertyDto } from '../../types/property';
 import { createProperty } from '../../api/property';
+import { CoLivingSection } from './CoLivingSection';
 
 interface AddPropertyModalProps {
   opened: boolean;
   onClose: () => void;
-  onAdd: (property: Property) => void;
 }
 
-export function AddPropertyModal({ opened, onClose, onAdd }: AddPropertyModalProps) {
+export function AddPropertyModal({ opened, onClose }: AddPropertyModalProps) {
   const form = useForm<CreatePropertyDto>({
     initialValues: {
       name: '',
@@ -23,6 +23,18 @@ export function AddPropertyModal({ opened, onClose, onAdd }: AddPropertyModalPro
       description: '',
       status: 'available',
       amenities: [],
+      isCoLiving: false,
+      coLivingDetails: {
+        totalRent: 0,
+        maxCoTenants: 2,
+        sharedAreas: [],
+        commonCharges: {
+          internet: 0,
+          electricity: 0,
+          water: 0,
+          heating: 0
+        }
+      }
     },
     validate: {
       name: (value) => (!value ? 'Name is required' : null),
@@ -40,7 +52,6 @@ export function AddPropertyModal({ opened, onClose, onAdd }: AddPropertyModalPro
         message: 'Property added successfully',
         color: 'green',
       });
-      onAdd(newProperty);
       onClose();
       form.reset();
     } catch (error: any) {
@@ -132,6 +143,7 @@ export function AddPropertyModal({ opened, onClose, onAdd }: AddPropertyModalPro
           placeholder="Property description"
           {...form.getInputProps('description')}
         />
+        <CoLivingSection form={form} />
         <Group justify="flex-end" mt="xl">
           <Button variant="light" onClick={onClose}>Cancel</Button>
           <Button type="submit">Add Property</Button>

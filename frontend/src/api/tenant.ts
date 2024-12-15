@@ -18,4 +18,9 @@ export const updateTenant = async (id: string, tenant: Partial<Tenant>): Promise
 
 export const deleteTenant = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/tenants/${id}`);
+};
+
+export const getTenantsByProperty = async (propertyId: string): Promise<Tenant[]> => {
+  const response = await axiosInstance.get(`/properties/${propertyId}/tenants`);
+  return response.data;
 }; 

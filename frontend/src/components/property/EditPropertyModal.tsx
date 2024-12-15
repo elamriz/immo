@@ -8,10 +8,9 @@ interface EditPropertyModalProps {
   property: Property;
   opened: boolean;
   onClose: () => void;
-  onUpdate: (property: Property) => void;
 }
 
-export function EditPropertyModal({ property, opened, onClose, onUpdate }: EditPropertyModalProps) {
+export function EditPropertyModal({ property, opened, onClose }: EditPropertyModalProps) {
   const form = useForm<Property>({
     initialValues: {
       ...property,
@@ -38,7 +37,6 @@ export function EditPropertyModal({ property, opened, onClose, onUpdate }: EditP
         message: 'Property updated successfully',
         color: 'green',
       });
-      onUpdate(updatedProperty);
       onClose();
     } catch (error: any) {
       console.error('Error updating property:', error);
