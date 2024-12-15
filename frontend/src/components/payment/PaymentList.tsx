@@ -2,6 +2,7 @@ import { Table, Badge, Group, Text, ActionIcon, Paper, Stack, SimpleGrid } from 
 import { IconEye, IconEdit, IconTrash } from '@tabler/icons-react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { getPropertyPayments } from '../../api/payment';
+import { getTenants } from '../../api/tenant';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PaymentDetailsModal } from './PaymentDetailsModal';
@@ -43,6 +44,12 @@ export function PaymentList({ propertyId }: PaymentListProps) {
   const { data: payments = [], isLoading } = useQuery(
     ['payments', propertyId],
     () => getPropertyPayments(propertyId),
+    { enabled: !!propertyId }
+  );
+
+  const { data: tenants = [] } = useQuery(
+    ['tenants', propertyId],
+    () => getTenants(propertyId as string),
     { enabled: !!propertyId }
   );
 

@@ -1,21 +1,14 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
-import { Property, ITenant } from '../models/Property';
-import { User, IUser } from '../models/User';
+import { Property } from '../models/Property';
+import { User } from '../models/User';
+import { Tenant } from '../models/Tenant';
+import { ITenant } from '../types/tenant';
 
 async function createTenant(req: Request, res: Response): Promise<Response> {
   try {
     const { propertyId } = req.params;
-    const {
-      firstName,
-      lastName,
-      email,
-      phone,
-      leaseStartDate,
-      leaseEndDate,
-      rentAmount,
-      depositAmount
-    } = req.body;
+    console.log('Creating tenant for property:', propertyId);
 
     // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
@@ -27,50 +20,20 @@ async function createTenant(req: Request, res: Response): Promise<Response> {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    // Créer un nouvel utilisateur pour le locataire
-    const user = new User({
-      firstName,
-      lastName,
-      email,
-      phone,
-      role: 'tenant'
-    });
-    const savedUser = await user.save() as IUser;
-
-    // Convertir l'ID en string puis en ObjectId
-    const userId = new Types.ObjectId(savedUser._id);
-
     // Créer le locataire
-    const tenantData: ITenant = {
-      _id: new Types.ObjectId(),
-      userId,
-      firstName,
-      lastName,
-      email,
-      phone,
-      leaseStartDate: new Date(leaseStartDate),
-      leaseEndDate: new Date(leaseEndDate),
-      rentAmount,
-      depositAmount,
-      status: 'active',
-      rentStatus: 'pending',
-      documents: {},
-      history: [{
-        action: 'created',
-        date: new Date(),
-        details: 'Tenant created'
-      }]
-    };
+    const tenant = new Tenant({
+      ...req.body,
+      propertyId,
+      status: 'active'
+    });
 
-    // Ajouter le locataire à la propriété
-    property.tenants.push(tenantData);
-    property.status = 'occupied';
-    await property.save();
+    await tenant.save();
+    console.log('Tenant created:', tenant._id);
 
-    const updatedProperty = await Property.findById(propertyId)
-      .populate('tenants.userId', 'firstName lastName email');
+    const populatedTenant = await Tenant.findById(tenant._id)
+      .populate('userId', 'firstName lastName email');
 
-    return res.status(201).json(updatedProperty);
+    return res.status(201).json(populatedTenant);
   } catch (error) {
     console.error('Error creating tenant:', error);
     return res.status(500).json({
@@ -126,24 +89,39 @@ async function updateTenant(req: Request, res: Response): Promise<Response> {
 
 async function getTenants(req: Request, res: Response): Promise<Response> {
   try {
-    const { propertyId } = req.query;
+    // Récupérer propertyId depuis les paramètres de route
+    const { propertyId } = req.params;
+    console.log('Fetching tenants for property:', propertyId);
 
-    // Si un propertyId est fourni, filtrer par propriété
-    const query = propertyId ? { 'tenants.propertyId': propertyId } : {};
+    // Vérifier que la propriété appartient à l'utilisateur
+    const property = await Property.findOne({
+      _id: propertyId,
+      owner: req.user._id
+    }).lean();
 
-    // Récupérer toutes les propriétés de l'utilisateur
-    const properties = await Property.find({
-      owner: req.user._id,
-      ...query
-    }).populate('tenants.userId', 'firstName lastName email');
+    if (!property) {
+      return res.status(403).json({ message: 'Not authorized to access this property' });
+    }
 
-    // Extraire tous les locataires actifs
-    const tenants = properties.reduce((acc: ITenant[], property) => {
-      const activeTenants = property.tenants.filter(tenant => tenant.status === 'active');
-      return [...acc, ...activeTenants];
-    }, []);
+    // Récupérer les locataires de cette propriété
+    const tenants = await Tenant.find({
+      propertyId,
+      status: 'active'
+    })
+    .populate('userId', 'firstName lastName email')
+    .lean();
 
-    return res.json(tenants);
+    console.log(`Found ${tenants.length} tenants for property ${propertyId}`);
+
+    // Convertir les IDs en ObjectId
+    const formattedTenants = tenants.map(tenant => ({
+      ...tenant,
+      _id: new Types.ObjectId(tenant._id.toString()),
+      propertyId: new Types.ObjectId(tenant.propertyId.toString()),
+      userId: tenant.userId ? new Types.ObjectId(tenant.userId.toString()) : undefined
+    })) as ITenant[];
+
+    return res.json(formattedTenants);
   } catch (error) {
     console.error('Error fetching tenants:', error);
     return res.status(500).json({

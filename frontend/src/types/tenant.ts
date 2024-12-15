@@ -1,16 +1,17 @@
+import { Types } from 'mongoose';
+
 export interface Tenant {
   _id: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
-  propertyId: string;
   leaseStartDate: Date;
   leaseEndDate: Date;
   rentAmount: number;
   depositAmount: number;
-  status: 'pending' | 'active' | 'ended';
-  rentStatus: 'paid' | 'pending' | 'late';
+  status: 'active' | 'inactive';
+  propertyId: string;
 }
 
 export interface CreateTenantDto {
@@ -18,11 +19,9 @@ export interface CreateTenantDto {
   lastName: string;
   email: string;
   phone: string;
-  propertyId: string;
   leaseStartDate: Date;
   leaseEndDate: Date;
   rentAmount: number;
   depositAmount: number;
-  status: 'pending' | 'active' | 'ended';
-  rentStatus: 'paid' | 'pending' | 'late';
+  propertyId: string;
 } 

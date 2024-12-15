@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import { Types } from 'mongoose';
-import { Property, ITenant } from '../models/Property';
+import { Property } from '../models/Property';
 import { Tenant } from '../models/Tenant';
+import { ITenant } from '../types/tenant';
 
 // Définir les fonctions sans les exporter individuellement
 async function createProperty(req: Request, res: Response): Promise<Response> {
@@ -24,45 +25,39 @@ async function getProperties(req: Request, res: Response): Promise<Response> {
     // Récupérer les propriétés
     const properties = await Property.find({ owner: req.user._id });
 
-    // Pour chaque propriété, récupérer les informations des locataires
+    // Pour chaque propriété, récupérer les locataires
     const propertiesWithTenants = await Promise.all(properties.map(async (property) => {
       const propertyObj = property.toObject();
       
-      // Récupérer tous les locataires actifs pour cette propriété
+      // Récupérer les locataires actifs pour cette propriété
       const tenants = await Tenant.find({ 
         propertyId: property._id,
         status: 'active'
       }).lean();
+
+      // Convertir les _id en ObjectId en passant par string
+      const formattedTenants = tenants.map(tenant => ({
+        ...tenant,
+        _id: new Types.ObjectId(tenant._id.toString()),
+        propertyId: new Types.ObjectId(tenant.propertyId.toString()),
+        userId: tenant.userId ? new Types.ObjectId(tenant.userId.toString()) : undefined
+      })) as ITenant[];
+
+      console.log(`Tenants for property ${property._id}:`, formattedTenants);
       
-      // Mettre à jour les informations des locataires dans la propriété
-      propertyObj.tenants = tenants
-        .filter((tenant: any) => tenant._id)
-        .map((tenant: any) => {
-          const tenantIdStr = tenant._id.toString();
-          const tenantId = new Types.ObjectId(tenantIdStr);
-          
-          return {
-            userId: tenantId,
-            firstName: tenant.firstName,
-            lastName: tenant.lastName,
-            leaseStartDate: tenant.leaseStartDate,
-            leaseEndDate: tenant.leaseEndDate,
-            rentAmount: tenant.rentAmount,
-            depositAmount: tenant.depositAmount,
-            status: 'active' as const,
-            rentStatus: tenant.rentStatus,
-            _id: tenantId
-          } as ITenant;
-        });
+      // Assigner les locataires à la propriété
+      propertyObj.tenants = formattedTenants;
       
-      console.log('Mapped tenants for property:', propertyObj.tenants);
       return propertyObj;
     }));
 
     return res.json(propertiesWithTenants);
   } catch (error) {
     console.error('Error in getProperties:', error);
-    return res.status(500).json({ message: 'Error fetching properties', error });
+    return res.status(500).json({ 
+      message: 'Error fetching properties', 
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }
 
@@ -209,17 +204,28 @@ async function getPropertyStats(req: Request, res: Response): Promise<Response> 
 
 async function getPropertyTenants(req: Request, res: Response): Promise<Response> {
   try {
-    const { id } = req.params;
+    const { propertyId } = req.params;
+    console.log('Fetching tenants for property:', propertyId);
+
+    // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
-      _id: id,
+      _id: propertyId,
       owner: req.user._id
-    }).populate('tenants');
+    });
 
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    return res.json(property.tenants);
+    // Récupérer les locataires actifs de cette propriété
+    const tenants = await Tenant.find({
+      propertyId: propertyId,
+      status: 'active'
+    }).lean();
+
+    console.log('Found tenants:', tenants);
+
+    return res.json(tenants);
   } catch (error) {
     console.error('Error getting property tenants:', error);
     return res.status(500).json({

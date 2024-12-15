@@ -2,17 +2,18 @@ import { Types } from 'mongoose';
 
 export interface ITenant {
   _id: Types.ObjectId;
-  userId: Types.ObjectId;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  propertyId: Types.ObjectId;
+  userId?: Types.ObjectId;
   leaseStartDate: Date;
   leaseEndDate: Date;
   rentAmount: number;
   depositAmount: number;
   status: 'active' | 'inactive';
-  rentStatus: 'paid' | 'pending' | 'late';
+  rentStatus?: 'pending' | 'paid' | 'late';
   documents?: {
     leaseContract?: string;
     idCard?: string;
