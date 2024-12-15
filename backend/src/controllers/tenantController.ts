@@ -1,219 +1,218 @@
 import { Request, Response } from 'express';
-import { Tenant } from '../models/Tenant';
+import { Types } from 'mongoose';
 import { Property, ITenant } from '../models/Property';
-import mongoose, { Types } from 'mongoose';
+import { User, IUser } from '../models/User';
 
-export const createTenant = async (req: Request, res: Response): Promise<Response> => {
+async function createTenant(req: Request, res: Response): Promise<Response> {
   try {
-    console.log('Creating tenant with data:', req.body);
+    const { propertyId } = req.params;
     const {
       firstName,
       lastName,
       email,
       phone,
-      propertyId,
       leaseStartDate,
       leaseEndDate,
       rentAmount,
-      depositAmount,
-      status,
-      rentStatus,
+      depositAmount
     } = req.body;
 
-    // Vérifier que la propriété existe et appartient au propriétaire
+    // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
       _id: propertyId,
       owner: req.user._id
     });
 
     if (!property) {
-      return res.status(404).json({ message: 'Property not found or not authorized' });
+      return res.status(404).json({ message: 'Property not found' });
     }
 
-    // Créer le locataire dans la collection Tenant
-    const tenant = new Tenant({
+    // Créer un nouvel utilisateur pour le locataire
+    const user = new User({
       firstName,
       lastName,
       email,
       phone,
-      propertyId: new Types.ObjectId(propertyId),
-      leaseStartDate,
-      leaseEndDate,
-      rentAmount,
-      depositAmount,
-      status,
-      rentStatus,
+      role: 'tenant'
     });
+    const savedUser = await user.save() as IUser;
 
-    // Sauvegarder le locataire
-    const savedTenant = await tenant.save();
-    console.log('Saved tenant:', savedTenant);
+    // Convertir l'ID en string puis en ObjectId
+    const userId = new Types.ObjectId(savedUser._id);
 
-    // Créer l'objet locataire pour la propriété
-    const tenantForProperty = {
-      userId: savedTenant._id as Types.ObjectId,
-      firstName: savedTenant.firstName,
-      lastName: savedTenant.lastName,
+    // Créer le locataire
+    const tenantData: ITenant = {
+      _id: new Types.ObjectId(),
+      userId,
+      firstName,
+      lastName,
+      email,
+      phone,
       leaseStartDate: new Date(leaseStartDate),
       leaseEndDate: new Date(leaseEndDate),
-      rentAmount: Number(rentAmount),
-      depositAmount: Number(depositAmount),
-      status: (status || 'pending') as 'active' | 'inactive' | 'pending',
-      rentStatus: (rentStatus || 'pending') as 'pending' | 'paid'
+      rentAmount,
+      depositAmount,
+      status: 'active',
+      rentStatus: 'pending',
+      documents: {},
+      history: [{
+        action: 'created',
+        date: new Date(),
+        details: 'Tenant created'
+      }]
     };
 
-    try {
-      // Ajouter le tenant à la propriété
-      property.tenants.push(tenantForProperty);
-      property.status = 'occupied';
-      await property.save();
+    // Ajouter le locataire à la propriété
+    property.tenants.push(tenantData);
+    property.status = 'occupied';
+    await property.save();
 
-      // Retourner le locataire créé avec les informations de la propriété
-      const populatedTenant = await Tenant.findById(savedTenant._id)
-        .populate('propertyId', 'name address');
+    const updatedProperty = await Property.findById(propertyId)
+      .populate('tenants.userId', 'firstName lastName email');
 
-      return res.status(201).json(populatedTenant);
-    } catch (propertyError) {
-      // Si l'ajout à la propriété échoue, supprimer le tenant créé
-      await Tenant.findByIdAndDelete(savedTenant._id);
-      throw propertyError;
-    }
+    return res.status(201).json(updatedProperty);
   } catch (error) {
     console.error('Error creating tenant:', error);
-    // Retourner une réponse plus détaillée
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: 'Error creating tenant',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      details: error
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-};
+}
 
-export const getTenants = async (req: Request, res: Response): Promise<Response> => {
+async function updateTenant(req: Request, res: Response): Promise<Response> {
   try {
-    const { propertyId } = req.query;
-    console.log('Getting tenants for property:', propertyId);
+    const { propertyId, tenantId } = req.params;
+    const updateData = req.body;
 
-    // Vérifier que la propriété appartient au propriétaire
-    const property = await Property.findOne({
-      _id: propertyId,
-      owner: req.user._id,
-    });
-
-    console.log('Found property:', property);
+    const property = await Property.findOneAndUpdate(
+      {
+        _id: propertyId,
+        owner: req.user._id,
+        'tenants._id': tenantId
+      },
+      {
+        $set: {
+          'tenants.$': {
+            ...updateData,
+            _id: new Types.ObjectId(tenantId),
+            history: [
+              ...(updateData.history || []),
+              {
+                action: 'updated',
+                date: new Date(),
+                details: 'Tenant information updated'
+              }
+            ]
+          }
+        }
+      },
+      { new: true }
+    ).populate('tenants.userId', 'firstName lastName email');
 
     if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
+      return res.status(404).json({ message: 'Property or tenant not found' });
     }
 
-    const tenants = await Tenant.find({ propertyId });
-    console.log('Found tenants:', tenants);
+    return res.json(property);
+  } catch (error) {
+    console.error('Error updating tenant:', error);
+    return res.status(500).json({
+      message: 'Error updating tenant',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function getTenants(req: Request, res: Response): Promise<Response> {
+  try {
+    const { propertyId } = req.query;
+
+    // Si un propertyId est fourni, filtrer par propriété
+    const query = propertyId ? { 'tenants.propertyId': propertyId } : {};
+
+    // Récupérer toutes les propriétés de l'utilisateur
+    const properties = await Property.find({
+      owner: req.user._id,
+      ...query
+    }).populate('tenants.userId', 'firstName lastName email');
+
+    // Extraire tous les locataires actifs
+    const tenants = properties.reduce((acc: ITenant[], property) => {
+      const activeTenants = property.tenants.filter(tenant => tenant.status === 'active');
+      return [...acc, ...activeTenants];
+    }, []);
+
     return res.json(tenants);
   } catch (error) {
     console.error('Error fetching tenants:', error);
-    return res.status(500).json({ 
-      message: 'Error fetching tenants', 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return res.status(500).json({
+      message: 'Error fetching tenants',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-};
+}
 
-export const updateTenant = async (req: Request, res: Response): Promise<Response> => {
+async function deleteTenant(req: Request, res: Response): Promise<Response> {
   try {
-    const { id } = req.params;
-    console.log('Updating tenant with ID:', id);
+    const { propertyId, tenantId } = req.params;
 
-    const tenant = await Tenant.findById(id);
-    if (!tenant) {
-      return res.status(404).json({ message: 'Tenant not found' });
-    }
-
-    // Vérifier que la propriété appartient au propriétaire
+    // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
-      _id: tenant.propertyId,
+      _id: propertyId,
       owner: req.user._id,
+      'tenants._id': tenantId
     });
 
     if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
+      return res.status(404).json({ message: 'Property or tenant not found' });
     }
 
-    // Mettre à jour le locataire dans la collection Tenant
-    const updatedTenant = await Tenant.findByIdAndUpdate(
-      id,
-      { ...req.body },
-      { new: true, runValidators: true }
+    // Mettre à jour le statut du locataire à 'inactive' au lieu de le supprimer
+    const updatedProperty = await Property.findOneAndUpdate(
+      {
+        _id: propertyId,
+        'tenants._id': tenantId
+      },
+      {
+        $set: {
+          'tenants.$.status': 'inactive',
+          'tenants.$.history': [
+            ...(property.tenants.find(t => t._id.toString() === tenantId)?.history || []),
+            {
+              action: 'deleted',
+              date: new Date(),
+              details: 'Tenant marked as inactive'
+            }
+          ]
+        }
+      },
+      { new: true }
+    ).populate('tenants.userId', 'firstName lastName email');
+
+    // Si c'était le dernier locataire actif, mettre à jour le statut de la propriété
+    const hasActiveTenants = property.tenants.some(
+      tenant => tenant.status === 'active' && tenant._id.toString() !== tenantId
     );
-
-    // Mettre à jour le locataire dans la propriété
-    const tenantIndex = property.tenants.findIndex(
-      t => t.userId.toString() === id
-    );
-
-    if (tenantIndex !== -1) {
-      property.tenants[tenantIndex] = {
-        ...property.tenants[tenantIndex],
-        leaseStartDate: req.body.leaseStartDate || property.tenants[tenantIndex].leaseStartDate,
-        leaseEndDate: req.body.leaseEndDate || property.tenants[tenantIndex].leaseEndDate,
-        rentAmount: req.body.rentAmount || property.tenants[tenantIndex].rentAmount,
-        depositAmount: req.body.depositAmount || property.tenants[tenantIndex].depositAmount,
-        status: req.body.status === 'active' ? 'active' : 'inactive',
-        rentStatus: req.body.rentStatus || property.tenants[tenantIndex].rentStatus
-      };
-
+    
+    if (!hasActiveTenants) {
+      property.status = 'available';
       await property.save();
     }
 
-    return res.json(updatedTenant);
-  } catch (error) {
-    console.error('Error updating tenant:', error);
-    return res.status(500).json({ 
-      message: 'Error updating tenant', 
-      error: error instanceof Error ? error.message : 'Unknown error' 
-    });
-  }
-};
-
-export const deleteTenant = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { id } = req.params;
-    const tenant = await Tenant.findById(id);
-
-    if (!tenant) {
-      return res.status(404).json({ message: 'Tenant not found' });
-    }
-
-    // Vérifier que la propriété appartient au propriétaire
-    const property = await Property.findOne({
-      _id: tenant.propertyId,
-      owner: req.user._id,
-    });
-
-    if (!property) {
-      return res.status(404).json({ message: 'Property not found' });
-    }
-
-    // Supprimer le locataire de la collection Tenant
-    await Tenant.findByIdAndDelete(id);
-
-    // Supprimer le locataire de la propriété
-    property.tenants = property.tenants.filter(
-      t => t.userId.toString() !== id
-    );
-
-    // Mettre à jour le statut de la propriété si nécessaire
-    if (property.tenants.length === 0) {
-      property.status = 'available';
-    }
-    
-    await property.save();
-
-    return res.json({ message: 'Tenant deleted successfully' });
+    return res.json(updatedProperty);
   } catch (error) {
     console.error('Error deleting tenant:', error);
-    return res.status(500).json({ 
-      message: 'Error deleting tenant', 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return res.status(500).json({
+      message: 'Error deleting tenant',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+}
+
+export {
+  createTenant,
+  getTenants,
+  updateTenant,
+  deleteTenant
 };

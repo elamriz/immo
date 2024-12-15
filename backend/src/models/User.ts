@@ -1,61 +1,69 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 export interface IUser extends Document {
-  email: string;
-  password: string;
+  _id: Types.ObjectId;
   firstName: string;
   lastName: string;
-  role: 'admin' | 'user';
+  email: string;
+  phone: string;
+  password: string;
+  role: 'owner' | 'tenant' | 'admin';
+  userType: 'owner' | 'tenant' | 'contractor';
   googleId?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
-  userType: 'owner' | 'tenant' | 'contractor';
+  createdAt: Date;
+  updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
 const userSchema = new Schema<IUser>({
-  email: {
-    type: String,
+  firstName: { 
+    type: String, 
     required: true,
+    trim: true 
+  },
+  lastName: { 
+    type: String, 
+    required: true,
+    trim: true 
+  },
+  email: { 
+    type: String, 
+    required: true, 
     unique: true,
     trim: true,
-    lowercase: true,
+    lowercase: true
+  },
+  phone: { 
+    type: String, 
+    required: true 
   },
   password: {
     type: String,
     required: function(this: IUser) {
       return !this.googleId;
-    },
+    }
   },
-  firstName: {
-    type: String,
-    required: true,
-    trim: true,
+  role: { 
+    type: String, 
+    enum: ['owner', 'tenant', 'admin'],
+    default: 'tenant'
   },
-  lastName: {
-    type: String,
-    required: true,
-    trim: true,
-  },
-  role: {
-    type: String,
-    enum: ['admin', 'user'],
-    default: 'user',
-  },
-  googleId: {
-    type: String,
-    sparse: true,
-  },
-  resetPasswordToken: String,
-  resetPasswordExpires: Date,
   userType: {
     type: String,
     enum: ['owner', 'tenant', 'contractor'],
     required: true
   },
+  googleId: {
+    type: String,
+    sparse: true
+  },
+  resetPasswordToken: String,
+  resetPasswordExpires: Date
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
 // Hash password before saving

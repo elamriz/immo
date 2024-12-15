@@ -1,23 +1,10 @@
 import { Request, Response } from 'express';
-import { Property, IProperty } from '../models/Property';
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
+import { Property, ITenant } from '../models/Property';
 import { Tenant } from '../models/Tenant';
 
-// Define the ITenant interface to match the Tenant model structure
-interface ITenant {
-  _id: Types.ObjectId;
-  userId: Types.ObjectId;
-  firstName: string;
-  lastName: string;
-  leaseStartDate: Date;
-  leaseEndDate: Date;
-  rentAmount: number;
-  depositAmount: number;
-  status: 'active' | 'inactive';
-  rentStatus: 'pending' | 'paid';
-}
-
-export const createProperty = async (req: Request, res: Response): Promise<Response> => {
+// Définir les fonctions sans les exporter individuellement
+async function createProperty(req: Request, res: Response): Promise<Response> {
   try {
     const property = new Property({
       ...req.body,
@@ -28,9 +15,9 @@ export const createProperty = async (req: Request, res: Response): Promise<Respo
   } catch (error) {
     return res.status(500).json({ message: 'Error creating property', error });
   }
-};
+}
 
-export const getProperties = async (req: Request, res: Response): Promise<Response> => {
+async function getProperties(req: Request, res: Response): Promise<Response> {
   try {
     console.log('Fetching properties for user:', req.user._id);
     
@@ -49,9 +36,8 @@ export const getProperties = async (req: Request, res: Response): Promise<Respon
       
       // Mettre à jour les informations des locataires dans la propriété
       propertyObj.tenants = tenants
-        .filter(tenant => tenant._id)
-        .map(tenant => {
-          // Ensure tenant._id is a string before converting to ObjectId
+        .filter((tenant: any) => tenant._id)
+        .map((tenant: any) => {
           const tenantIdStr = tenant._id.toString();
           const tenantId = new Types.ObjectId(tenantIdStr);
           
@@ -64,7 +50,7 @@ export const getProperties = async (req: Request, res: Response): Promise<Respon
             rentAmount: tenant.rentAmount,
             depositAmount: tenant.depositAmount,
             status: 'active' as const,
-            rentStatus: tenant.rentStatus === 'late' ? 'pending' : tenant.rentStatus,
+            rentStatus: tenant.rentStatus,
             _id: tenantId
           } as ITenant;
         });
@@ -78,36 +64,42 @@ export const getProperties = async (req: Request, res: Response): Promise<Respon
     console.error('Error in getProperties:', error);
     return res.status(500).json({ message: 'Error fetching properties', error });
   }
-};
+}
 
-export const getPropertyById = async (req: Request, res: Response): Promise<Response> => {
+async function getProperty(req: Request, res: Response): Promise<Response> {
   try {
+    const { id } = req.params;
+
+    // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
-      _id: req.params.id,
+      _id: id,
       owner: req.user._id
-    }).populate('tenants.userId', 'firstName lastName email _id');
-    
+    })
+    .populate('tenants')
+    .lean();
+
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    const propertyObj = property.toObject();
-    propertyObj.tenants = propertyObj.tenants.filter(tenant => tenant.status === 'active');
-    
-    return res.json(propertyObj);
+    return res.json(property);
   } catch (error) {
-    return res.status(500).json({ message: 'Error fetching property', error });
+    console.error('Error fetching property:', error);
+    return res.status(500).json({
+      message: 'Error fetching property',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
-};
+}
 
-export const updateProperty = async (req: Request, res: Response): Promise<Response> => {
+async function updateProperty(req: Request, res: Response): Promise<Response> {
   try {
     const property = await Property.findOneAndUpdate(
       { _id: req.params.id, owner: req.user._id },
       req.body,
       { new: true }
     ).populate('tenants.userId', 'firstName lastName email _id');
-
+    
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
@@ -119,9 +111,9 @@ export const updateProperty = async (req: Request, res: Response): Promise<Respo
   } catch (error) {
     return res.status(500).json({ message: 'Error updating property', error });
   }
-};
+}
 
-export const deleteProperty = async (req: Request, res: Response): Promise<Response> => {
+async function deleteProperty(req: Request, res: Response): Promise<Response> {
   try {
     const property = await Property.findOneAndDelete({
       _id: req.params.id,
@@ -136,10 +128,9 @@ export const deleteProperty = async (req: Request, res: Response): Promise<Respo
   } catch (error) {
     return res.status(500).json({ message: 'Error deleting property', error });
   }
-};
+}
 
-// Nouvelle fonction pour ajouter un locataire à une propriété
-export const addTenant = async (req: Request, res: Response): Promise<Response> => {
+async function addTenant(req: Request, res: Response): Promise<Response> {
   try {
     const { propertyId } = req.params;
     const tenantData = req.body;
@@ -163,10 +154,9 @@ export const addTenant = async (req: Request, res: Response): Promise<Response> 
   } catch (error) {
     return res.status(500).json({ message: 'Error adding tenant', error });
   }
-};
+}
 
-// Nouvelle fonction pour mettre à jour un locataire
-export const updateTenant = async (req: Request, res: Response): Promise<Response> => {
+async function updateTenant(req: Request, res: Response): Promise<Response> {
   try {
     const { propertyId, tenantId } = req.params;
     const updateData = req.body;
@@ -193,30 +183,61 @@ export const updateTenant = async (req: Request, res: Response): Promise<Respons
   } catch (error) {
     return res.status(500).json({ message: 'Error updating tenant', error });
   }
-};
+}
 
-export const getProperty = async (req: Request, res: Response): Promise<Response> => {
+async function getPropertyStats(req: Request, res: Response): Promise<Response> {
+  try {
+    const properties = await Property.find({ owner: req.user._id });
+    
+    const stats = {
+      total: properties.length,
+      occupied: properties.filter(p => p.status === 'occupied').length,
+      available: properties.filter(p => p.status === 'available').length,
+      maintenance: properties.filter(p => p.status === 'maintenance').length,
+      totalRent: properties.reduce((sum, p) => sum + p.rentAmount, 0)
+    };
+
+    return res.json(stats);
+  } catch (error) {
+    console.error('Error getting property stats:', error);
+    return res.status(500).json({
+      message: 'Error getting property stats',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function getPropertyTenants(req: Request, res: Response): Promise<Response> {
   try {
     const { id } = req.params;
-
-    // Vérifier que la propriété appartient à l'utilisateur
     const property = await Property.findOne({
       _id: id,
       owner: req.user._id
-    })
-    .populate('tenants')
-    .lean();
+    }).populate('tenants');
 
     if (!property) {
       return res.status(404).json({ message: 'Property not found' });
     }
 
-    return res.json(property);
+    return res.json(property.tenants);
   } catch (error) {
-    console.error('Error fetching property:', error);
+    console.error('Error getting property tenants:', error);
     return res.status(500).json({
-      message: 'Error fetching property',
+      message: 'Error getting property tenants',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
+}
+
+// Un seul export à la fin du fichier
+export {
+  createProperty,
+  getProperties,
+  getProperty,
+  updateProperty,
+  deleteProperty,
+  addTenant,
+  updateTenant,
+  getPropertyStats,
+  getPropertyTenants
 }; 

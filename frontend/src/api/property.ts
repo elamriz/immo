@@ -17,8 +17,19 @@ export const createProperty = async (property: CreatePropertyDto): Promise<Prope
 };
 
 export const updateProperty = async (id: string, property: Partial<Property>): Promise<Property> => {
-  const response = await axiosInstance.patch(`/properties/${id}`, property);
-  return response.data;
+  try {
+    console.log('Tentative de mise à jour de la propriété:', { id, property });
+    const response = await axiosInstance.patch(`/properties/${id}`, property);
+    console.log('Réponse du serveur:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Erreur détaillée:', {
+      error,
+      response: error.response?.data,
+      status: error.response?.status
+    });
+    throw error;
+  }
 };
 
 export const deleteProperty = async (id: string): Promise<void> => {
