@@ -2,15 +2,9 @@ import { Request, Response } from 'express';
 import { Payment } from '../models/Payment';
 import { Property } from '../models/Property';
 import { Tenant } from '../models/Tenant';
-
-// Exporter toutes les méthodes
-export {
-  createPayment,
-  getPayments,
-  updatePayment,
-  deletePayment,
-  updateLatePayments,
-};
+import { sendPaymentConfirmationEmail, sendPaymentReminderEmail } from '../services/emailService';
+import { generateReceiptPDF } from '../services/pdfService';
+import { populatePayment } from '../types/shared';
 
 // Définir les méthodes
 async function createPayment(req: Request, res: Response): Promise<Response> {
@@ -220,4 +214,212 @@ async function updateLatePayments(): Promise<void> {
 
 // Cette fonction pourrait être appelée par un cron job quotidien
 
-// Autres méthodes du contrôleur... 
+async function getPaymentStats(req: Request, res: Response): Promise<Response> {
+  try {
+    const { propertyId } = req.params;
+    const query = propertyId ? { propertyId } : {};
+
+    const [payments, latePaments] = await Promise.all([
+      Payment.find({ ...query, owner: req.user._id }),
+      Payment.find({
+        ...query,
+        owner: req.user._id,
+        status: 'late'
+      })
+    ]);
+
+    const totalDue = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments
+      .filter(p => p.status === 'paid')
+      .reduce((sum, p) => sum + p.amount, 0);
+    const totalLate = latePaments.reduce((sum, p) => sum + p.amount, 0);
+
+    const stats = {
+      totalDue,
+      totalPaid,
+      totalLate,
+      paymentRate: totalDue > 0 ? (totalPaid / totalDue) * 100 : 0
+    };
+
+    return res.json(stats);
+  } catch (error) {
+    console.error('Error fetching payment stats:', error);
+    return res.status(500).json({
+      message: 'Error fetching payment stats',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function markAsPaid(req: Request, res: Response): Promise<Response> {
+  try {
+    const { id } = req.params;
+    const payment = await Payment.findById(id);
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Paiement non trouvé' });
+    }
+
+    const [tenant, property] = await Promise.all([
+      Tenant.findById(payment.tenantId),
+      Property.findOne({ _id: payment.propertyId, owner: req.user._id })
+    ]);
+
+    if (!property) {
+      return res.status(403).json({ message: 'Non autorisé' });
+    }
+
+    if (!tenant) {
+      return res.status(404).json({ message: 'Locataire non trouvé' });
+    }
+
+    const updatedPayment = await Payment.findByIdAndUpdate(
+      id,
+      {
+        status: 'paid',
+        paidDate: new Date(),
+      },
+      { new: true }
+    );
+
+    if (!updatedPayment) {
+      throw new Error('Failed to update payment');
+    }
+
+    if (tenant.email) {
+      const populatedData = populatePayment(updatedPayment, tenant, property);
+      await sendPaymentConfirmationEmail(tenant.email, populatedData);
+    }
+
+    return res.json(updatedPayment);
+  } catch (error) {
+    console.error('Error marking payment as paid:', error);
+    return res.status(500).json({
+      message: 'Error marking payment as paid',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function sendReminder(req: Request, res: Response): Promise<Response> {
+  try {
+    const { id } = req.params;
+    const payment = await Payment.findById(id);
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Paiement non trouvé' });
+    }
+
+    const [tenant, property] = await Promise.all([
+      Tenant.findById(payment.tenantId),
+      Property.findOne({ _id: payment.propertyId, owner: req.user._id })
+    ]);
+
+    if (!property) {
+      return res.status(403).json({ message: 'Non autorisé' });
+    }
+
+    if (!tenant?.email) {
+      return res.status(400).json({ message: 'Email du locataire non disponible' });
+    }
+
+    const populatedData = populatePayment(payment, tenant, property);
+    await sendPaymentReminderEmail(tenant.email, populatedData);
+
+    // Enregistrer le rappel dans l'historique
+    await Payment.findByIdAndUpdate(id, {
+      $push: {
+        history: {
+          action: 'reminder_sent',
+          performedBy: req.user._id,
+          timestamp: new Date()
+        }
+      }
+    });
+
+    return res.json({ message: 'Rappel envoyé avec succès' });
+  } catch (error) {
+    console.error('Error sending payment reminder:', error);
+    return res.status(500).json({
+      message: 'Error sending payment reminder',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function generateReceipt(req: Request, res: Response): Promise<void> {
+  try {
+    const { id } = req.params;
+    const payment = await Payment.findById(id);
+
+    if (!payment) {
+      res.status(404).json({ message: 'Paiement non trouvé' });
+      return;
+    }
+
+    const [tenant, property] = await Promise.all([
+      Tenant.findById(payment.tenantId),
+      Property.findOne({ _id: payment.propertyId, owner: req.user._id })
+    ]);
+
+    if (!property) {
+      res.status(403).json({ message: 'Non autorisé' });
+      return;
+    }
+
+    if (!tenant) {
+      res.status(404).json({ message: 'Locataire non trouvé' });
+      return;
+    }
+
+    const populatedData = populatePayment(payment, tenant, property);
+    const pdfBuffer = await generateReceiptPDF(populatedData, req.user);
+
+    // Envoyer le PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=quittance-${payment._id}.pdf`);
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating receipt:', error);
+    res.status(500).json({
+      message: 'Error generating receipt',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+async function getPaymentsByProperty(req: Request, res: Response): Promise<Response> {
+  try {
+    const { propertyId } = req.params;
+    console.log('Fetching payments for property:', propertyId); // Pour le debug
+    
+    const payments = await Payment.find({ propertyId })
+      .populate('tenantId', 'firstName lastName')
+      .populate('propertyId', 'name')
+      .sort({ dueDate: -1 });
+
+    console.log('Found payments:', payments.length); // Pour le debug
+
+    return res.json(payments);
+  } catch (error) {
+    console.error('Error fetching property payments:', error);
+    return res.status(500).json({
+      message: 'Error fetching property payments',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}
+
+// Exporter toutes les méthodes à la fin du fichier
+export {
+  createPayment,
+  getPayments,
+  updatePayment,
+  deletePayment,
+  updateLatePayments,
+  getPaymentStats,
+  markAsPaid,
+  sendReminder,
+  generateReceipt,
+  getPaymentsByProperty
+}; 

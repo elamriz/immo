@@ -1,16 +1,31 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IPayment extends Document {
-  tenantId: mongoose.Types.ObjectId;
-  propertyId: mongoose.Types.ObjectId;
+  _id: Types.ObjectId;
   amount: number;
   dueDate: Date;
   paidDate?: Date;
   status: 'pending' | 'paid' | 'late';
   paymentMethod?: 'bank_transfer' | 'cash' | 'check';
   reference?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  tenantId: Types.ObjectId;
+  propertyId: Types.ObjectId;
+  isCoLivingShare: boolean;
+  shareDetails?: {
+    percentage: number;
+    totalRent: number;
+    commonCharges: {
+      internet?: number;
+      electricity?: number;
+      water?: number;
+      heating?: number;
+    };
+  };
+  history?: Array<{
+    action: string;
+    performedBy: Types.ObjectId;
+    timestamp: Date;
+  }>;
 }
 
 const paymentSchema = new Schema<IPayment>({
@@ -52,9 +67,41 @@ const paymentSchema = new Schema<IPayment>({
   },
   reference: { 
     type: String 
+  },
+  isCoLivingShare: {
+    type: Boolean,
+    default: false
+  },
+  shareDetails: {
+    percentage: Number,
+    totalRent: Number,
+    commonCharges: {
+      internet: Number,
+      electricity: Number,
+      water: Number,
+      heating: Number
+    }
   }
 }, {
   timestamps: true
+});
+
+// Middleware pour calculer le montant en fonction des parts
+paymentSchema.pre('save', async function(next) {
+  if (this.isCoLivingShare && this.shareDetails) {
+    // Calculer le montant du loyer
+    const rentShare = (this.shareDetails.totalRent * this.shareDetails.percentage) / 100;
+    
+    // Calculer les charges
+    const charges = Object.values(this.shareDetails.commonCharges || {}).reduce(
+      (sum, charge) => sum + (charge || 0),
+      0
+    );
+
+    // Mettre à jour le montant total
+    this.amount = rentShare + charges;
+  }
+  next();
 });
 
 // Ajouter des index composites pour améliorer les performances

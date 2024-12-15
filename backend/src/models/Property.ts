@@ -28,6 +28,18 @@ export interface IProperty extends Document {
   tenants: ITenant[];
   createdAt: Date;
   updatedAt: Date;
+  isCoLiving: boolean;
+  coLivingDetails?: {
+    totalRent: number;
+    sharedAreas: string[];
+    maxCoTenants: number;
+    commonCharges?: {
+      internet?: number;
+      electricity?: number;
+      water?: number;
+      heating?: number;
+    };
+  };
 }
 
 const propertySchema = new Schema<IProperty>({
@@ -94,7 +106,22 @@ const propertySchema = new Schema<IProperty>({
       enum: ['pending', 'paid'],
       default: 'pending'
     }
-  }]
+  }],
+  isCoLiving: {
+    type: Boolean,
+    default: false
+  },
+  coLivingDetails: {
+    totalRent: Number,
+    sharedAreas: [String],
+    maxCoTenants: Number,
+    commonCharges: {
+      internet: Number,
+      electricity: Number,
+      water: Number,
+      heating: Number
+    }
+  }
 }, {
   timestamps: true
 });

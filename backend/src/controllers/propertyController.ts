@@ -193,4 +193,30 @@ export const updateTenant = async (req: Request, res: Response): Promise<Respons
   } catch (error) {
     return res.status(500).json({ message: 'Error updating tenant', error });
   }
+};
+
+export const getProperty = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+
+    // Vérifier que la propriété appartient à l'utilisateur
+    const property = await Property.findOne({
+      _id: id,
+      owner: req.user._id
+    })
+    .populate('tenants')
+    .lean();
+
+    if (!property) {
+      return res.status(404).json({ message: 'Property not found' });
+    }
+
+    return res.json(property);
+  } catch (error) {
+    console.error('Error fetching property:', error);
+    return res.status(500).json({
+      message: 'Error fetching property',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 }; 

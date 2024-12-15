@@ -7,7 +7,8 @@ import {
   updateProperty,
   deleteProperty,
   addTenant,
-  updateTenant
+  updateTenant,
+  getProperty
 } from '../controllers/propertyController';
 
 const router = express.Router();
@@ -18,7 +19,7 @@ router.use(auth);
 // Routes de base pour les propriétés
 router.post('/', createProperty);
 router.get('/', getProperties);
-router.get('/:id', getPropertyById);
+router.get('/:id', getProperty);
 router.put('/:id', updateProperty);
 router.delete('/:id', deleteProperty);
 
