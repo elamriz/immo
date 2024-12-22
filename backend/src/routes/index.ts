@@ -5,6 +5,7 @@ import tenantRoutes from './tenantRoutes';
 import paymentRoutes from './paymentRoutes';
 import ticketRoutes from './ticketRoutes';
 import contractorRoutes from './contractorRoutes';
+import statsRoutes from './statsRoutes';
 
 const router = express.Router();
 
@@ -17,5 +18,6 @@ router.use('/tenants', tenantRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/tickets', ticketRoutes);
 router.use('/contractors', contractorRoutes);
+router.use('/stats', statsRoutes);
 
 export default router; 
