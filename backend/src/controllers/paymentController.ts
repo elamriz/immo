@@ -391,20 +391,27 @@ async function generateReceipt(req: Request, res: Response): Promise<void> {
 async function getPaymentsByProperty(req: Request, res: Response): Promise<Response> {
   try {
     const { propertyId } = req.params;
-    console.log('Fetching payments for property:', propertyId); // Pour le debug
-    
+
+    // Vérifier que la propriété appartient à l'utilisateur
+    const property = await Property.findOne({
+      _id: propertyId,
+      owner: req.user._id
+    });
+
+    if (!property) {
+      return res.status(403).json({ message: 'Not authorized to access this property' });
+    }
+
     const payments = await Payment.find({ propertyId })
-      .populate('tenantId', 'firstName lastName')
+      .populate('tenantId', 'firstName lastName email')
       .populate('propertyId', 'name')
       .sort({ dueDate: -1 });
 
-    console.log('Found payments:', payments.length); // Pour le debug
-
     return res.json(payments);
   } catch (error) {
-    console.error('Error fetching property payments:', error);
+    console.error('Error fetching payments:', error);
     return res.status(500).json({
-      message: 'Error fetching property payments',
+      message: 'Error fetching payments',
       error: error instanceof Error ? error.message : 'Unknown error'
     });
   }

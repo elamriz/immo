@@ -3,8 +3,8 @@ export interface User {
     email: string;
     firstName: string;
     lastName: string;
-    role: 'admin' | 'user';
-    userType: 'owner' | 'tenant' | 'contractor';
+    role: 'owner' | 'tenant' | 'contractor' | 'admin';
+    phone: string;
   }
   
   export interface AuthResponse {
@@ -20,5 +20,6 @@ export interface User {
   export interface RegisterCredentials extends LoginCredentials {
     firstName: string;
     lastName: string;
-    userType: 'owner' | 'tenant' | 'contractor';
+    role: 'owner' | 'tenant' | 'contractor';
+    phone: string;
   }

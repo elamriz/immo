@@ -14,8 +14,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Configuration CORS
-app.use(cors());
+// Configuration CORS avec options spécifiques
+app.use(cors({
+  origin: 'http://localhost:3000', // Allow frontend domain
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 // Connexion à MongoDB avec plus de logs
@@ -42,7 +48,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 5001;
 app.listen(PORT, () => {
   console.log(`✅ Serveur démarré sur le port ${PORT}`);
-}); 
+});

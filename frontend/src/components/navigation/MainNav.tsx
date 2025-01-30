@@ -24,7 +24,8 @@ export function MainNav() {
         onClick={() => navigate('/dashboard')}
       />
 
-      {user?.userType === 'owner' && (
+      {/* Liens pour les propriétaires */}
+      {user?.role === 'owner' && (
         <>
           <NavLink
             label="Propriétés"
@@ -63,8 +64,16 @@ export function MainNav() {
         </>
       )}
 
-      {user?.userType === 'tenant' && (
+      {/* Liens pour les locataires */}
+      {user?.role === 'tenant' && (
         <>
+          <NavLink
+            label="Mon logement"
+            leftSection={<IconBuilding size={20} />}
+            active={isActive('/my-property')}
+            onClick={() => navigate('/my-property')}
+          />
+
           <NavLink
             label="Mes paiements"
             leftSection={<IconReceipt size={20} />}
@@ -77,6 +86,58 @@ export function MainNav() {
             leftSection={<IconTicket size={20} />}
             active={isActive('/my-tickets')}
             onClick={() => navigate('/my-tickets')}
+          />
+        </>
+      )}
+
+      {/* Liens pour les entrepreneurs */}
+      {user?.role === 'contractor' && (
+        <>
+          <NavLink
+            label="Mes interventions"
+            leftSection={<IconTools size={20} />}
+            active={isActive('/my-interventions')}
+            onClick={() => navigate('/my-interventions')}
+          />
+
+          <NavLink
+            label="Tickets en attente"
+            leftSection={<IconTicket size={20} />}
+            active={isActive('/pending-tickets')}
+            onClick={() => navigate('/pending-tickets')}
+          />
+        </>
+      )}
+
+      {/* Liens pour les administrateurs */}
+      {user?.role === 'admin' && (
+        <>
+          <NavLink
+            label="Utilisateurs"
+            leftSection={<IconUsers size={20} />}
+            active={isActive('/users')}
+            onClick={() => navigate('/users')}
+          />
+
+          <NavLink
+            label="Propriétés"
+            leftSection={<IconBuilding size={20} />}
+            active={isActive('/properties')}
+            onClick={() => navigate('/properties')}
+          />
+
+          <NavLink
+            label="Tickets"
+            leftSection={<IconTicket size={20} />}
+            active={isActive('/tickets')}
+            onClick={() => navigate('/tickets')}
+          />
+
+          <NavLink
+            label="Réparateurs"
+            leftSection={<IconTools size={20} />}
+            active={isActive('/contractors')}
+            onClick={() => navigate('/contractors')}
           />
         </>
       )}

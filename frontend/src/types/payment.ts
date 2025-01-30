@@ -18,6 +18,17 @@ export interface Payment {
   status: 'pending' | 'paid' | 'late';
   paymentMethod?: 'bank_transfer' | 'cash' | 'check';
   reference?: string;
+  isCoLivingShare: boolean;
+  shareDetails?: {
+    percentage: number;
+    totalRent: number;
+    commonCharges: {
+      internet?: number;
+      electricity?: number;
+      water?: number;
+      heating?: number;
+    };
+  };
 }
 
 export interface CreatePaymentDto {

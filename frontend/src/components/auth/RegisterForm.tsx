@@ -5,25 +5,28 @@ import { register } from '../../api/auth';
 import { useAuthStore } from '../../store/authStore';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
+import { RegisterCredentials } from '../../types/auth';
 
 export function RegisterForm() {
   const setAuth = useAuthStore((state) => state.setAuth);
   const navigate = useNavigate();
 
-  const form = useForm({
+  const form = useForm<RegisterCredentials>({
     initialValues: {
       email: '',
       password: '',
       firstName: '',
       lastName: '',
-      userType: '',
+      role: 'owner' as const,
+      phone: '',
     },
     validate: {
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Invalid email'),
       password: (value) => (value.length < 6 ? 'Password should be at least 6 characters' : null),
       firstName: (value) => (value.length < 2 ? 'First name is required' : null),
       lastName: (value) => (value.length < 2 ? 'Last name is required' : null),
-      userType: (value) => (!value ? 'Please select your role' : null),
+      role: (value) => (!value ? 'Please select your role' : null),
+      phone: (value) => (!value ? 'Phone number is required' : null),
     },
   });
 
@@ -69,6 +72,13 @@ export function RegisterForm() {
           placeholder="your@email.com"
           {...form.getInputProps('email')}
         />
+        <TextInput
+          required
+          mt="md"
+          label="Phone"
+          placeholder="Your phone number"
+          {...form.getInputProps('phone')}
+        />
         <PasswordInput
           required
           mt="md"
@@ -86,7 +96,7 @@ export function RegisterForm() {
             { value: 'tenant', label: 'Tenant' },
             { value: 'contractor', label: 'Contractor' },
           ]}
-          {...form.getInputProps('userType')}
+          {...form.getInputProps('role')}
         />
         <Group justify="flex-end" mt="md">
           <Button type="submit" loading={mutation.isLoading}>

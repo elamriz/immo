@@ -9,6 +9,7 @@ import { PaymentDetailsModal } from './PaymentDetailsModal';
 import { markPaymentAsPaid, sendPaymentReminder } from '../../api/payment';
 import { notifications } from '@mantine/notifications';
 import { useState, useMemo } from 'react';
+import { Payment } from '../../types/payment';
 
 interface PaymentListProps {
   propertyId: string | null;
@@ -41,9 +42,9 @@ export function PaymentList({ propertyId }: PaymentListProps) {
     }
   });
 
-  const { data: payments = [], isLoading } = useQuery(
+  const { data: payments = [], isLoading } = useQuery<Payment[]>(
     ['payments', propertyId],
-    () => getPropertyPayments(propertyId),
+    () => getPropertyPayments(propertyId as string),
     { enabled: !!propertyId }
   );
 
@@ -58,7 +59,7 @@ export function PaymentList({ propertyId }: PaymentListProps) {
     if (!acc[month]) acc[month] = [];
     acc[month].push(payment);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {} as Record<string, Payment[]>);
 
   const stats = useMemo(() => {
     const total = payments.length;
@@ -85,9 +86,9 @@ export function PaymentList({ propertyId }: PaymentListProps) {
   if (!propertyId) {
     return (
       <Paper p="xl" withBorder>
-        <Stack align="center" spacing="md">
-          <Text size="lg" weight={500}>Sélectionnez une propriété</Text>
-          <Text color="dimmed">
+        <Stack align="center" gap="md">
+          <Text size="lg" fw={500}>Sélectionnez une propriété</Text>
+          <Text c="dimmed">
             Veuillez sélectionner une propriété pour voir ses paiements
           </Text>
         </Stack>
@@ -96,12 +97,12 @@ export function PaymentList({ propertyId }: PaymentListProps) {
   }
 
   return (
-    <Stack spacing="md">
+    <Stack gap="md">
       <SimpleGrid cols={4}>
         <Paper withBorder p="md">
-          <Stack spacing={0}>
+          <Stack gap={0}>
             <Text size="sm" c="dimmed">Total des paiements</Text>
-            <Group position="apart" align="baseline">
+            <Group justify="space-between" align="baseline">
               <Text fw={700} size="xl">{stats.totalAmount.toLocaleString('fr-FR')}€</Text>
               <Badge>{stats.total} paiements</Badge>
             </Group>
@@ -109,9 +110,9 @@ export function PaymentList({ propertyId }: PaymentListProps) {
         </Paper>
 
         <Paper withBorder p="md">
-          <Stack spacing={0}>
+          <Stack gap={0}>
             <Text size="sm" c="dimmed">Paiements reçus</Text>
-            <Group position="apart" align="baseline">
+            <Group justify="space-between" align="baseline">
               <Text fw={700} size="xl" c="green">
                 {stats.paidAmount.toLocaleString('fr-FR')}€
               </Text>
@@ -121,9 +122,9 @@ export function PaymentList({ propertyId }: PaymentListProps) {
         </Paper>
 
         <Paper withBorder p="md">
-          <Stack spacing={0}>
+          <Stack gap={0}>
             <Text size="sm" c="dimmed">En attente</Text>
-            <Group position="apart" align="baseline">
+            <Group justify="space-between" align="baseline">
               <Text fw={700} size="xl" c="yellow">
                 {((stats.totalAmount - stats.paidAmount)).toLocaleString('fr-FR')}€
               </Text>
@@ -133,9 +134,9 @@ export function PaymentList({ propertyId }: PaymentListProps) {
         </Paper>
 
         <Paper withBorder p="md">
-          <Stack spacing={0}>
+          <Stack gap={0}>
             <Text size="sm" c="dimmed">En retard</Text>
-            <Group position="apart" align="baseline">
+            <Group justify="space-between" align="baseline">
               <Text fw={700} size="xl" c="red">
                 {payments
                   .filter(p => p.status === 'late')
@@ -150,7 +151,7 @@ export function PaymentList({ propertyId }: PaymentListProps) {
 
       {Object.entries(groupedPayments).map(([month, monthPayments]) => (
         <Paper key={month} withBorder p="md" mb="md">
-          <Text size="lg" weight={500} mb="md">{month}</Text>
+          <Text size="lg" fw={500} mb="md">{month}</Text>
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -166,20 +167,26 @@ export function PaymentList({ propertyId }: PaymentListProps) {
               {monthPayments.map((payment) => (
                 <Table.Tr key={payment._id}>
                   <Table.Td>
-                    <Group spacing="sm">
-                      {payment.tenantId.firstName} {payment.tenantId.lastName}
-                      {payment.isCoLivingShare && (
-                        <Badge size="sm">
-                          {payment.shareDetails?.percentage}%
-                        </Badge>
+                    <Group gap="sm">
+                      {payment.tenantId ? (
+                        <>
+                          {payment.tenantId.firstName} {payment.tenantId.lastName}
+                          {payment.isCoLivingShare && (
+                            <Badge size="sm">
+                              {payment.shareDetails?.percentage}%
+                            </Badge>
+                          )}
+                        </>
+                      ) : (
+                        <Text c="dimmed">Locataire supprimé</Text>
                       )}
                     </Group>
                   </Table.Td>
                   <Table.Td>
-                    <Stack spacing={0}>
+                    <Stack gap={0}>
                       <Text>{payment.amount}€</Text>
                       {payment.isCoLivingShare && (
-                        <Text size="xs" color="dimmed">
+                        <Text size="xs" c="dimmed">
                           Loyer: {((payment.shareDetails?.totalRent || 0) * 
                             (payment.shareDetails?.percentage || 0) / 100).toFixed(2)}€
                           {Object.entries(payment.shareDetails?.commonCharges || {})

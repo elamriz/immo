@@ -7,7 +7,7 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const register = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { email, password, firstName, lastName, userType } = req.body;
+    const { email, password, firstName, lastName, role, phone } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -19,8 +19,8 @@ export const register = async (req: Request, res: Response): Promise<Response> =
       password,
       firstName,
       lastName,
-      userType,
-      role: 'user',
+      role,
+      phone,
     });
 
     await user.save();
@@ -39,7 +39,7 @@ export const register = async (req: Request, res: Response): Promise<Response> =
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        userType: user.userType,
+        phone: user.phone,
       },
     });
   } catch (error) {
@@ -79,7 +79,6 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        userType: user.userType,
       },
     });
   } catch (error) {
@@ -112,6 +111,7 @@ export const googleAuth = async (req: Request, res: Response): Promise<Response>
         firstName: payload.given_name,
         lastName: payload.family_name,
         googleId: payload.sub,
+        role: 'tenant', // default role for Google auth users
       });
       await user.save();
     }

@@ -8,8 +8,7 @@ export interface IUser extends Document {
   email: string;
   phone: string;
   password: string;
-  role: 'owner' | 'tenant' | 'admin';
-  userType: 'owner' | 'tenant' | 'contractor';
+  role: 'owner' | 'tenant' | 'contractor' | 'admin';
   googleId?: string;
   resetPasswordToken?: string;
   resetPasswordExpires?: Date;
@@ -48,13 +47,8 @@ const userSchema = new Schema<IUser>({
   },
   role: { 
     type: String, 
-    enum: ['owner', 'tenant', 'admin'],
+    enum: ['owner', 'tenant', 'contractor', 'admin'],
     default: 'tenant'
-  },
-  userType: {
-    type: String,
-    enum: ['owner', 'tenant', 'contractor'],
-    required: true
   },
   googleId: {
     type: String,

@@ -113,15 +113,7 @@ async function getTenants(req: Request, res: Response): Promise<Response> {
 
     console.log(`Found ${tenants.length} tenants for property ${propertyId}`);
 
-    // Convertir les IDs en ObjectId
-    const formattedTenants = tenants.map(tenant => ({
-      ...tenant,
-      _id: new Types.ObjectId(tenant._id.toString()),
-      propertyId: new Types.ObjectId(tenant.propertyId.toString()),
-      userId: tenant.userId ? new Types.ObjectId(tenant.userId.toString()) : undefined
-    })) as ITenant[];
-
-    return res.json(formattedTenants);
+    return res.json(tenants);
   } catch (error) {
     console.error('Error fetching tenants:', error);
     return res.status(500).json({
